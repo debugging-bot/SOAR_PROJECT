@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TeamMate 수어 번역</title>
+<style>
+  /* 고령 사용자 기준: 2m 거리에서 읽히는 글씨, 명암 대비 최소 7:1 */
+  :root{
+    --ink:#101418;        /* 본문 글자 */
+    --paper:#FFFFFF;      /* 배경 */
+    --muted:#6B7280;      /* 보조 글자 */
+    --line:#D9DEE5;
+    --wait:#9AA3AE;       /* 대기 */
+    --reading:#E08A00;    /* 인식 중 */
+    --done:#0F8A3D;       /* 확정 */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--paper); color:var(--ink);
+    font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  /* ── 상단: 카메라 + 상태 ─────────────────────────── */
+  header{display:flex; align-items:stretch; border-bottom:2px solid var(--line);}
+  #cam{width:320px; height:240px; object-fit:cover; background:#000; flex:none;}
+  .status{flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 28px; gap:10px;}
+  .dot-row{display:flex; align-items:center; gap:14px;}
+  .dot{width:26px;height:26px;border-radius:50%;background:var(--wait);flex:none}
+  .dot.reading{background:var(--reading)}
+  .dot.done{background:var(--done)}
+  #statusText{font-size:30px; font-weight:700;}
+  #hint{font-size:20px; color:var(--muted);}
+  .bar{height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+  .bar > i{display:block;height:100%;width:0;background:var(--reading);transition:width .1s linear}
+
+  /* ── 중앙: 확정된 단어 (이 화면의 주인공) ───────────── */
+  main{flex:1; display:flex; align-items:center; justify-content:center; padding:12px 24px; min-height:0;}
+  #word{
+    font-size:clamp(72px, 15vw, 220px); font-weight:800; line-height:1.05;
+    letter-spacing:-0.02em; text-align:center; word-break:keep-all;
+  }
+  #word.placeholder{font-size:clamp(28px,4vw,44px); font-weight:600; color:var(--muted);}
+  #word.flash{animation:pop .35s ease-out}
+  @keyframes pop{from{transform:scale(.94);opacity:.4} to{transform:scale(1);opacity:1}}
+  @media (prefers-reduced-motion: reduce){ #word.flash{animation:none} }
+
+  /* ── 하단: 대화 이력 + 빠른 단어 ───────────────────── */
+  footer{border-top:2px solid var(--line);}
+  #history{display:flex; gap:12px; padding:14px 20px; overflow-x:auto; min-height:78px; align-items:center;}
+  #history:empty::after{content:"인식된 말이 여기에 순서대로 쌓입니다";color:var(--muted);font-size:20px}
+  .chip{
+    flex:none; border:2px solid var(--line); border-radius:14px;
+    padding:10px 20px; font-size:30px; font-weight:700; white-space:nowrap;
+  }
+  .chip.latest{border-color:var(--done); color:var(--done);}
+  #quick{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:0 20px 18px;}
+  #quick button{
+    font:inherit; font-size:28px; font-weight:700; padding:18px 6px; cursor:pointer;
+    background:var(--paper); color:var(--ink); border:3px solid var(--ink); border-radius:16px;
+  }
+  #quick button:active{background:var(--ink); color:var(--paper);}
+  #quick button:focus-visible{outline:5px solid var(--reading); outline-offset:3px;}
+
+  /* ── 시작 화면 (브라우저 음성 허용을 위해 필요) ──────── */
+  #gate{
+    position:fixed; inset:0; background:var(--paper); z-index:10;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; text-align:center; padding:24px;
+  }
+  #gate h1{font-size:clamp(32px,5vw,56px); font-weight:800;}
+  #gate p{font-size:22px; color:var(--muted); max-width:32ch; word-break:keep-all;}
+  #gate button{
+    font:inherit; font-size:40px; font-weight:800; padding:24px 64px; cursor:pointer;
+    border:none; border-radius:20px; background:var(--ink); color:var(--paper);
+  }
+  #err{position:fixed;left:0;right:0;bottom:0;background:#8A1010;color:#fff;
+       font-size:22px;padding:14px 20px;display:none;z-index:20}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>수어를 한국어로 바꿔 드립니다</h1>
+  <p>화면을 누르면 카메라가 켜집니다. 카메라 앞에서 수어를 하시면 큰 글씨와 음성으로 안내합니다.</p>
+  <button id="start">시작하기</button>
+</div>
+
+<header>
+  <img id="cam" alt="카메라 화면" />
+  <div class="status">
+    <div class="dot-row">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">준비 중</span>
+    </div>
+    <div id="hint">카메라 앞에 서 주세요</div>
+    <div class="bar"><i id="progress"></i></div>
+  </div>
+</header>
+
+<main><div id="word" class="placeholder">카메라 앞에서 수어를 시작하세요</div></main>
+
+<footer>
+  <div id="history"></div>
+  <div id="quick">
+    <button data-say="접수하러 왔어요">접수</button>
+    <button data-say="약 받으러 왔어요">약</button>
+    <button data-say="아파요">아파요</button>
+    <button data-say="도와주세요">도움</button>
+    <button data-say="" id="clear">지우기</button>
+  </div>
+</footer>
+
+<div id="err"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let voiceReady = false;
+
+/* 브라우저는 사용자가 한 번 클릭해야 소리를 낼 수 있다.
+   시작 버튼이 그 역할을 한다. 이 버튼이 없으면 TTS가 조용히 실패한다. */
+$("start").addEventListener("click", () => {
+  try {
+    const warm = new SpeechSynthesisUtterance(" ");
+    warm.lang = "ko-KR";
+    speechSynthesis.speak(warm);
+    voiceReady = true;
+  } catch (e) { /* 음성이 없어도 화면 출력은 계속된다 */ }
+  $("cam").src = "/video";
+  $("gate").style.display = "none";
+  connect();
+});
+
+function speak(text){
+  if (!voiceReady || !text) return;
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ko-KR";
+  u.rate = 0.85;      // 조금 천천히
+  u.volume = 1.0;
+  speechSynthesis.speak(u);
+}
+
+function showWord(text){
+  const el = $("word");
+  el.classList.remove("placeholder", "flash");
+  void el.offsetWidth;              // 애니메이션 재시작
+  el.textContent = text;
+  el.classList.add("flash");
+
+  const hist = $("history");
+  [...hist.children].forEach(c => c.classList.remove("latest"));
+  const chip = document.createElement("div");
+  chip.className = "chip latest";
+  chip.textContent = text;
+  hist.appendChild(chip);
+  hist.scrollLeft = hist.scrollWidth;
+}
+
+const STATUS = {
+  WAIT:    ["대기 중",   "카메라 앞에 서 주세요",        ""],
+  READY:   ["준비됨",     "이제 수어를 시작하세요",       ""],
+  READING: ["읽는 중",    "그대로 조금만 유지해 주세요",   "reading"],
+};
+
+function connect(){
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+
+  ws.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+
+    if (d.error) {
+      $("err").style.display = "block";
+      $("err").textContent = d.error;
+    }
+
+    const [label, hint, cls] = STATUS[d.status] || STATUS.WAIT;
+    $("statusText").textContent = label;
+    $("hint").textContent = hint;
+    $("dot").className = "dot " + cls;
+    $("progress").style.width = Math.round((d.progress || 0) * 100) + "%";
+
+    (d.words || []).forEach(w => {
+      showWord(w.word);
+      speak(w.word);
+      $("dot").className = "dot done";
+    });
+  };
+
+  ws.onclose = () => {
+    $("statusText").textContent = "연결 끊김";
+    $("hint").textContent = "서버가 꺼졌습니다. 5초 뒤 다시 연결합니다.";
+    setTimeout(connect, 5000);
+  };
+}
+
+document.querySelectorAll("#quick button[data-say]").forEach(b => {
+  b.addEventListener("click", () => {
+    const t = b.dataset.say;
+    if (t) { showWord(t); speak(t); }
+  });
+});
+$("clear").addEventListener("click", () => {
+  $("history").innerHTML = "";
+  const el = $("word");
+  el.className = "placeholder";
+  el.textContent = "카메라 앞에서 수어를 시작하세요";
+});
+</script>
+</body>
+</html>
