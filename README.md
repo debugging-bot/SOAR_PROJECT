@@ -17,7 +17,7 @@
 git clone https://github.com/debugging-bot/SOAR_PROJECT.git
 cd SOAR_PROJECT
 
-python -m venv venv
+py -3.11 -m venv venv
 venv\Scripts\activate            # Windows
 # source venv/bin/activate       # macOS / Linux
 ```
