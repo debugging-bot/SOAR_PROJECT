@@ -1,19 +1,15 @@
-# 파이썬 3.11 기준. 3.13 이상은 mediapipe 설치 파일이 아직 없으니 쓰지 말 것.
-#
-# 설치:
-#   pip install -r requirements.txt
-#
-# 버전을 굳이 적어 둔 이유: 팀원 5명의 버전이 다르면
-# "내 컴퓨터에서는 되는데 네 컴퓨터에서는 안 되는" 문제가 반드시 생긴다.
-# 특히 tensorflow 버전이 다르면 학습한 모델 파일을 서로 못 읽는다.
+# Python 3.11 required. Python 3.13+ has no mediapipe wheels yet.
+# Install:  pip install -r requirements.txt
+# Versions are pinned so all 5 members share the same environment.
+# A tensorflow version mismatch means you cannot open each other's model files.
 
 numpy>=1.26,<3
 opencv-python>=4.9
 mediapipe>=0.10.14
-tensorflow>=2.16,<2.21     # 설치 실패 시: pip install tensorflow-cpu
+tensorflow>=2.16,<2.21
 scikit-learn>=1.4
-matplotlib>=3.8            # 혼동행렬 그림용 (없어도 동작함)
-pillow>=10.0               # 화면에 한글 글씨 그리기용
+matplotlib>=3.8
+pillow>=10.0
 
 fastapi>=0.110
 uvicorn>=0.29
