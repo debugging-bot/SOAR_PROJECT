@@ -14,8 +14,8 @@
 ### 2. 코드 받고 가상환경 만들기
 
 ```bash
-git clone <우리 저장소 주소>
-cd teammate
+git clone https://github.com/debugging-bot/SOAR_PROJECT.git
+cd SOAR_PROJECT
 
 python -m venv venv
 venv\Scripts\activate            # Windows
