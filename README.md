@@ -14,10 +14,10 @@
 ### 2. 코드 받고 가상환경 만들기
 
 ```bash
-git clone https://github.com/debugging-bot/SOAR_PROJECT.git
-cd SOAR_PROJECT
+git clone <우리 저장소 주소>
+cd teammate
 
-py -3.11 -m venv venv
+python -m venv venv
 venv\Scripts\activate            # Windows
 # source venv/bin/activate       # macOS / Linux
 ```
@@ -79,6 +79,7 @@ teammate/
 │  └─ download_models.py MediaPipe 모델 내려받기
 ├─ src/
 │  ├─ config.py          팀 공통 상수 — 함부로 고치지 말 것
+│  ├─ sampler.py         프레임 샘플링 (촬영/실시간 공통)  ★건드리면 정확도 깨짐
 │  ├─ labels.py          단어 목록 읽기
 │  ├─ landmarker.py      MediaPipe 감싸기        (조원 2)
 │  ├─ features.py        좌표 -> 146차원 특징     (조원 2)  ★핵심
@@ -105,6 +106,7 @@ teammate/
 | `ModuleNotFoundError: No module named 'cv2'` | `venv` activate를 안 한 것. 다시 activate 후 설치 |
 | `모델 파일이 없습니다` | `python setup/download_models.py` |
 | `웹캠을 열 수 없습니다` | 줌·팀즈 끄기 / 노트북 카메라 셔터 확인 / `src/config.py`의 `CAM_INDEX`를 1, 2로 바꿔 보기 |
+| 촬영 시간이 짧게 느껴짐 | 녹화 창은 `src/config.py`의 `SEQ_LEN x FRAME_STRIDE / 30`초입니다. 현재 30 x 2 / 30 = 2.0초. 값을 바꾸면 이미 찍은 데이터는 쓸 수 없습니다 |
 | 화면 글씨가 네모(□)로 보임 | OpenCV는 한글을 못 그림. 정상이며, 브라우저 화면(`server.py`)에서는 정상 출력됨 |
 | 학습은 잘됐는데 실시간에서만 못 맞춤 | 학습과 실시간이 같은 `features.build_feature_vector`를 쓰는지 확인 (가장 흔한 원인) |
 | `pip install mediapipe` 실패 | 파이썬 3.13을 쓰고 있을 가능성. `python --version`으로 확인하고 3.11로 다시 |
@@ -118,5 +120,6 @@ teammate/
 - `main` 브랜치에 직접 push 금지. `feature/이름` 에서 작업 → `dev` 로 합치기
 - `src/config.py`의 값은 3주차 확정 이후 전원 합의 없이 수정 금지
 - `labels.json`의 `id` 순서는 절대 바꾸지 않는다 (모델이 전부 틀린 답을 냄)
+- 프레임 건너뛰기는 `src/sampler.py`의 `FrameSampler`만 쓴다. 촬영·실시간이 달라지면 "학습은 잘되는데 실시간에서만 못 맞추는" 문제가 생긴다
 - `data/`, `models/`, `venv/` 는 `.gitignore`에 있으므로 올라가지 않는다
 - 코드를 고친 뒤에는 push 전에 `python tests/smoke_test.py` 를 돌린다

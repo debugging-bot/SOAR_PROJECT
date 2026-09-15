@@ -25,7 +25,6 @@ import asyncio
 import sys
 import threading
 import time
-from collections import deque
 from pathlib import Path
 
 import cv2
@@ -34,11 +33,13 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from config import (CONF_THRESHOLD, KERAS_MODEL, MIRROR, PREDICT_EVERY, SEQ_LEN)
+from config import (CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR,
+                    PREDICT_EVERY, SEQ_LEN)
 from confirm import Confirmer
 from features import build_feature_vector, hand_detected_count
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
+from sampler import FrameSampler
 
 STATE = {
     "jpeg": None,          # 최신 프레임(JPEG 바이트)
@@ -78,9 +79,11 @@ def worker(demo: bool, threshold: float):
         print(f"[worker] {e}")
         return
 
-    buf: deque = deque(maxlen=SEQ_LEN)
+    sampler = FrameSampler()
     confirmer = Confirmer(threshold=threshold)
     frame_no, seq_id = 0, 0
+    print(f"[worker] 인식 창 {FrameSampler.window_seconds():.1f}초 "
+          f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
     fps_t, fps_n = time.time(), 0
 
     try:
@@ -95,15 +98,16 @@ def worker(demo: bool, threshold: float):
 
             hands, pose = lm.process(frame)
             vec = build_feature_vector(hands, pose)
-            buf.append(vec)
+            taken = sampler.offer(vec)
 
             n_hand = hand_detected_count(vec)
-            if n_hand == 0 and len(buf) >= 10 and all(
-                    hand_detected_count(v) == 0 for v in list(buf)[-10:]):
+            if n_hand == 0 and len(sampler) >= 10 and all(
+                    hand_detected_count(v) == 0 for v in sampler.recent(10)):
                 confirmer.reset()
 
-            if model is not None and len(buf) == SEQ_LEN and frame_no % PREDICT_EVERY == 0:
-                x = np.array(buf, dtype=np.float32)[np.newaxis, ...]
+            if (model is not None and taken and sampler.full()
+                    and sampler.taken % PREDICT_EVERY == 0):
+                x = sampler.array()[np.newaxis, ...]
                 prob = model.predict(x, verbose=0)[0]
                 cid, conf = int(np.argmax(prob)), float(np.max(prob))
                 done = confirmer.update(cid, conf)

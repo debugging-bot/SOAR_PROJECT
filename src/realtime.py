@@ -17,7 +17,6 @@ realtime.py — 웹캠 앞에서 실시간으로 단어를 인식한다. (조원
 import argparse
 import sys
 import time
-from collections import deque
 from pathlib import Path
 
 import cv2
@@ -25,12 +24,13 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import (CONF_THRESHOLD, CONSECUTIVE_N, FEATURE_DIM, KERAS_MODEL,
-                    MIRROR, PREDICT_EVERY, SEQ_LEN)
+from config import (CONF_THRESHOLD, CONSECUTIVE_N, FEATURE_DIM, FRAME_STRIDE,
+                    KERAS_MODEL, MIRROR, PREDICT_EVERY, SEQ_LEN)
 from confirm import Confirmer
 from features import build_feature_vector, hand_detected_count
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
+from sampler import FrameSampler
 
 # ---------------------------------------------------------------- 한글 그리기
 _FONT_CANDIDATES = [
@@ -70,7 +70,8 @@ def put_korean(img, text, xy, color=(255, 255, 255)):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--threshold", type=float, default=CONF_THRESHOLD)
-    ap.add_argument("--every", type=int, default=PREDICT_EVERY)
+    ap.add_argument("--every", type=int, default=PREDICT_EVERY,
+                    help="표본 몇 개마다 예측할 것인가 (프레임이 아니라 표본 기준)")
     args = ap.parse_args()
 
     if not KERAS_MODEL.exists():
@@ -89,13 +90,15 @@ def main():
     lm = Landmarker()
     confirmer = Confirmer(threshold=args.threshold)
 
-    buf: deque = deque(maxlen=SEQ_LEN)
+    sampler = FrameSampler()
     frame_no = 0
     fps_t, fps_n, fps = time.time(), 0, 0.0
     top_id, top_conf = -1, 0.0
     history: list[str] = []
     banner, banner_until = "", 0.0
 
+    print(f"인식 창 {FrameSampler.window_seconds():.1f}초 "
+          f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
     print("준비 완료. 카메라 앞에서 수어를 해 보세요. (q=종료)")
     try:
         while True:
@@ -108,16 +111,16 @@ def main():
 
             hands, pose = lm.process(frame)
             vec = build_feature_vector(hands, pose)
-            buf.append(vec)
+            taken = sampler.offer(vec)
 
             # 손이 오래 안 잡히면 이전 기록을 버린다 (엉뚱한 확정 방지)
             if hand_detected_count(vec) == 0:
-                if len(buf) == SEQ_LEN and all(
-                        hand_detected_count(v) == 0 for v in list(buf)[-10:]):
+                if sampler.full() and all(
+                        hand_detected_count(v) == 0 for v in sampler.recent(10)):
                     confirmer.reset()
 
-            if len(buf) == SEQ_LEN and frame_no % args.every == 0:
-                x = np.array(buf, dtype=np.float32)[np.newaxis, ...]  # (1,30,146)
+            if taken and sampler.full() and sampler.taken % args.every == 0:
+                x = sampler.array()[np.newaxis, ...]               # (1,30,146)
                 prob = model.predict(x, verbose=0)[0]
                 top_id, top_conf = int(np.argmax(prob)), float(np.max(prob))
 
@@ -143,7 +146,7 @@ def main():
                      else ("READING" if confirmer.progress > 0 else "READY"))
             color = {"WAIT": (120, 120, 120), "READY": (0, 200, 255),
                      "READING": (0, 255, 0)}[state]
-            cv2.putText(frame, f"{state}  fps={fps:4.1f}  buf={len(buf)}/{SEQ_LEN}",
+            cv2.putText(frame, f"{state}  fps={fps:4.1f}  buf={len(sampler)}/{SEQ_LEN}",
                         (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             if top_id >= 0:
                 cv2.putText(frame, f"top=id{top_id} conf={top_conf:.2f}",
@@ -162,7 +165,7 @@ def main():
             if key == ord("q"):
                 break
             if key == ord("r"):
-                buf.clear()
+                sampler.reset()
                 confirmer.reset()
     finally:
         cap.release()

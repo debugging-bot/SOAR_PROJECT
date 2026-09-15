@@ -19,7 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from augment import add_noise, augment_dataset, time_resample, time_shift  # noqa: E402
-from config import FEATURE_DIM, SEQ_LEN  # noqa: E402
+from config import FEATURE_DIM, FRAME_STRIDE, SEQ_LEN  # noqa: E402
 from confirm import Confirmer  # noqa: E402
 from features import (build_feature_vector, empty_feature_vector,  # noqa: E402
                       hand_detected_count, normalize_hand_shape)
@@ -174,7 +174,45 @@ ok("다른 단어가 섞이면 확정 안 됨", all(m is None for m in mixed))
 
 print()
 print("=" * 60)
-print("5. 모델 (TensorFlow가 있을 때만)")
+print("5. 프레임 샘플러 (촬영/실시간 공통)")
+print("=" * 60)
+
+from sampler import FrameSampler  # noqa: E402
+
+sp = FrameSampler()
+ok("스트라이드 설정", sp.stride == FRAME_STRIDE, f"stride={sp.stride}")
+ok("담기는 시간", abs(FrameSampler.window_seconds() - SEQ_LEN * FRAME_STRIDE / 30) < 1e-9,
+   f"{FrameSampler.window_seconds():.2f}초")
+
+frames = 0
+while not sp.full():
+    sp.offer(np.zeros(FEATURE_DIM, dtype=np.float32))
+    frames += 1
+    if frames > 10000:
+        break
+ok("버퍼가 채워진다", sp.full(), f"카메라 {frames}프레임 소비")
+ok("소비 프레임 수가 스트라이드에 비례",
+   frames == (SEQ_LEN - 1) * FRAME_STRIDE + 1, f"{frames}장")
+ok("array() shape", sp.array().shape == (SEQ_LEN, FEATURE_DIM), f"{sp.array().shape}")
+ok("표본 수 집계", sp.taken == SEQ_LEN, f"taken={sp.taken}")
+
+sp2 = FrameSampler()
+taken_flags = [sp2.offer(np.zeros(FEATURE_DIM, dtype=np.float32)) for _ in range(6)]
+expect = [i % FRAME_STRIDE == 0 for i in range(6)]
+ok("담는 프레임 간격이 일정", taken_flags == expect, f"{taken_flags}")
+
+sp2.reset()
+ok("reset 후 비워짐", len(sp2) == 0 and sp2.frames == 0 and sp2.taken == 0)
+
+sp3 = FrameSampler()
+for i in range(500):
+    sp3.offer(np.full(FEATURE_DIM, float(i), dtype=np.float32))
+last = sp3.array()[-1][0]
+ok("가장 최근 표본이 버퍼 끝에 있다", last > 490, f"마지막 값 {last:.0f}")
+
+print()
+print("=" * 60)
+print("6. 모델 (TensorFlow가 있을 때만)")
 print("=" * 60)
 try:
     import tensorflow  # noqa: F401

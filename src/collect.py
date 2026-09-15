@@ -32,10 +32,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import DATA_DIR, MIRROR, SEQ_LEN
+from config import DATA_DIR, FRAME_STRIDE, MIRROR, SEQ_LEN
 from features import build_feature_vector, hand_detected_count
 from labels import load_labels, slug_to_id
 from landmarker import Landmarker, open_camera
+from sampler import FrameSampler
 
 # 손이 하나도 안 잡힌 프레임이 이 비율을 넘으면 저장하지 않고 다시 찍게 한다
 MAX_EMPTY_RATIO = 0.30
@@ -95,6 +96,10 @@ def main():
     ko = next(w["ko"] for w in words if w["slug"] == args.word)
     print(f"단어: {args.word} ({ko}) / 촬영자: {args.person} / 속도: {args.speed}")
     print(f"목표: {args.count}회, 저장 위치: {folder}")
+    print(f"녹화 길이: {FrameSampler.window_seconds():.1f}초 "
+          f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
+    print("카운트다운이 끝나면 손을 올리기 시작하고, 동작이 일찍 끝나면 "
+          "손을 내리지 말고 마지막 자세를 그대로 유지하세요.")
     print("창을 클릭해 활성화한 뒤 SPACE를 누르세요. (q=종료, a=자동반복, d=직전삭제)")
 
     cap = open_camera()
@@ -105,7 +110,7 @@ def main():
     last_saved_path = None
     state = "idle"          # idle -> countdown -> recording
     count_from = 0.0
-    buf: list[np.ndarray] = []
+    sampler = FrameSampler()
     flash = ""
     flash_until = 0.0
 
@@ -127,7 +132,8 @@ def main():
             now = time.time()
             if state == "idle":
                 draw_guide(view, [
-                    f"word={args.word}  person={args.person}  speed={args.speed}",
+                    f"word={args.word}  person={args.person}  speed={args.speed}"
+                    f"  window={FrameSampler.window_seconds():.1f}s",
                     f"saved {saved}/{args.count}   next #{idx:03d}",
                     "SPACE=record   a=auto:%s   d=delete last   q=quit" % ("ON" if auto else "off"),
                     f"hands detected: {hand_detected_count(vec)}",
@@ -138,7 +144,8 @@ def main():
             elif state == "countdown":
                 left = 3.0 - (now - count_from)
                 if left <= 0:
-                    state, buf = "recording", []
+                    sampler.reset()
+                    state = "recording"
                 else:
                     draw_guide(view, ["GET READY"], (0, 200, 255))
                     cv2.putText(view, str(int(left) + 1),
@@ -146,18 +153,22 @@ def main():
                                 cv2.FONT_HERSHEY_SIMPLEX, 3.0, (0, 200, 255), 6)
 
             elif state == "recording":
-                buf.append(vec)
-                p = len(buf) / SEQ_LEN
+                sampler.offer(vec)
                 w = view.shape[1]
-                cv2.rectangle(view, (0, 0), (int(w * p), 10), (0, 0, 255), -1)
-                draw_guide(view, [f"RECORDING {len(buf)}/{SEQ_LEN}"], (0, 0, 255))
+                cv2.rectangle(view, (0, 0), (int(w * sampler.progress), 10),
+                              (0, 0, 255), -1)
+                draw_guide(view, [
+                    f"RECORDING {len(sampler)}/{SEQ_LEN}",
+                    "HOLD the final pose until the bar fills",
+                ], (0, 0, 255))
 
-                if len(buf) == SEQ_LEN:
-                    seq = np.array(buf, dtype=np.float32)      # (30, 146)
+                if sampler.full():
+                    seq = sampler.array()                      # (30, 146)
                     empty = sum(1 for v in seq if hand_detected_count(v) == 0)
                     if empty / SEQ_LEN > MAX_EMPTY_RATIO:
-                        flash = f"REJECTED (no hand in {empty}/{SEQ_LEN} frames)"
-                        print(f"  버림: 손이 안 잡힌 프레임 {empty}개. 조명/거리를 조정하고 다시 찍으세요.")
+                        flash = f"REJECTED (no hand in {empty}/{SEQ_LEN} samples)"
+                        print(f"  버림: 손이 안 잡힌 표본 {empty}개. 동작을 끝까지 유지했는지, "
+                              "조명과 거리가 맞는지 확인하고 다시 찍으세요.")
                     else:
                         path = folder / f"{args.person}_{args.speed}_{idx:03d}.npy"
                         np.save(path, seq)
