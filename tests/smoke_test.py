@@ -216,10 +216,13 @@ print("6. 모델 (TensorFlow가 있을 때만)")
 print("=" * 60)
 try:
     import tensorflow  # noqa: F401
+    from labels import load_labels
     from train import build_model
-    m = build_model(12)
+    n_cls = len(load_labels())
+    m = build_model(n_cls)
     out = m.predict(np.zeros((2, SEQ_LEN, FEATURE_DIM), dtype=np.float32), verbose=0)
-    ok("모델 출력 shape", out.shape == (2, 12), f"{out.shape}")
+    ok("labels.json 클래스 수", n_cls > 0, f"{n_cls}개")
+    ok("모델 출력 shape", out.shape == (2, n_cls), f"{out.shape}")
     ok("확률 합 = 1", np.allclose(out.sum(axis=1), 1.0, atol=1e-4))
 except ImportError:
     print("[skip] TensorFlow 미설치 — 학습 담당(조원 3)만 확인하면 됩니다")
