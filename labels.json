@@ -3,14 +3,14 @@
   "_상태": "초안입니다. 국립국어원 한국수어사전에서 실제 동작을 확인하고 교체·추가하세요.",
   "words": [
     {"id": 0,  "slug": "yes",     "ko": "네", "display": "네"},
-    {"id": 1,  "slug": "no",        "ko": "아니오",        "display": "아니오"},
-    {"id": 2,  "slug": "yes",       "ko": "화장실",        "display": "화장실"},
-    {"id": 3,  "slug": "no",        "ko": "경찰",     "display": "경찰"},
+    {"id": 1,  "slug": "no",        "ko": "아니요",        "display": "아니요"},
+    {"id": 2,  "slug": "toilet",       "ko": "화장실",        "display": "화장실"},
+    {"id": 3,  "slug": "police",        "ko": "경찰",     "display": "경찰"},
     {"id": 4,  "slug": "pain",      "ko": "아프다",     "display": "아파요"},
-    {"id": 5,  "slug": "head",      "ko": "돕다",       "display": "돕다"},
-    {"id": 6,  "slug": "stomach",   "ko": "신분증",         "display": "신분증"},
-    {"id": 7,  "slug": "medicine",  "ko": "전화",         "display": "전화"},
-    {"id": 8,  "slug": "hospital",  "ko": "잠시만요",       "display": "잠시만요"},
-    {"id": 9,  "slug": "reception", "ko": "곤란",       "display": "곤란"}
+    {"id": 5,  "slug": "help",      "ko": "돕다",       "display": "도와주세요"},
+    {"id": 6,  "slug": "idcard",   "ko": "신분증",         "display": "신분증"},
+    {"id": 7,  "slug": "phone",  "ko": "전화",         "display": "전화"},
+    {"id": 8,  "slug": "wait",  "ko": "잠시만요",       "display": "잠시만요"},
+    {"id": 9,  "slug": "trouble", "ko": "곤란",       "display": "곤란해요"}
   ]
 }
