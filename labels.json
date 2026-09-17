@@ -2,17 +2,15 @@
   "_주의": "id는 0부터 순서대로. 한 번 정하면 절대 바꾸지 마세요. 3주차에 조원 1이 최종 확정합니다.",
   "_상태": "초안입니다. 국립국어원 한국수어사전에서 실제 동작을 확인하고 교체·추가하세요.",
   "words": [
-    {"id": 0,  "slug": "hello",     "ko": "안녕하세요", "display": "안녕하세요"},
-    {"id": 1,  "slug": "me",        "ko": "나",        "display": "저는"},
-    {"id": 2,  "slug": "yes",       "ko": "네",        "display": "네"},
-    {"id": 3,  "slug": "no",        "ko": "아니요",     "display": "아니요"},
+    {"id": 0,  "slug": "yes",     "ko": "네", "display": "네"},
+    {"id": 1,  "slug": "no",        "ko": "아니요",        "display": "아니요"},
+    {"id": 2,  "slug": "toilet",       "ko": "화장실",        "display": "화장실"},
+    {"id": 3,  "slug": "police",        "ko": "경찰",     "display": "경찰"},
     {"id": 4,  "slug": "pain",      "ko": "아프다",     "display": "아파요"},
-    {"id": 5,  "slug": "head",      "ko": "머리",       "display": "머리"},
-    {"id": 6,  "slug": "stomach",   "ko": "배",         "display": "배"},
-    {"id": 7,  "slug": "medicine",  "ko": "약",         "display": "약"},
-    {"id": 8,  "slug": "hospital",  "ko": "병원",       "display": "병원"},
-    {"id": 9,  "slug": "reception", "ko": "접수",       "display": "접수하러 왔어요"},
-    {"id": 10, "slug": "help",      "ko": "도와주세요",  "display": "도와주세요"},
-    {"id": 11, "slug": "cancel",    "ko": "취소",       "display": "취소"}
+    {"id": 5,  "slug": "help",      "ko": "돕다",       "display": "도와주세요"},
+    {"id": 6,  "slug": "idcard",   "ko": "신분증",         "display": "신분증"},
+    {"id": 7,  "slug": "phone",  "ko": "전화",         "display": "전화"},
+    {"id": 8,  "slug": "wait",  "ko": "잠시만요",       "display": "잠시만요"},
+    {"id": 9,  "slug": "trouble", "ko": "곤란",       "display": "곤란해요"}
   ]
 }
