@@ -99,11 +99,11 @@ def main():
     model.summary()
 
     callbacks = [
-        keras.callbacks.EarlyStopping(monitor="val_accuracy", patience=25,
+        keras.callbacks.EarlyStopping(monitor="val_loss", patience=25,
                                       restore_best_weights=True, verbose=1),
         keras.callbacks.ReduceLROnPlateau(monitor="val_loss", factor=0.5,
                                           patience=10, min_lr=1e-5, verbose=1),
-        keras.callbacks.ModelCheckpoint(str(KERAS_MODEL), monitor="val_accuracy",
+        keras.callbacks.ModelCheckpoint(str(KERAS_MODEL), monitor="val_loss",
                                         save_best_only=True, verbose=0),
     ]
 
@@ -117,7 +117,8 @@ def main():
         verbose=2,
     )
 
-    best = float(max(hist.history["val_accuracy"]))
+    i_best = int(np.argmin(hist.history["val_loss"]))
+    best = float(hist.history["val_accuracy"][i_best])
     model.save(KERAS_MODEL)
     print(f"\n최고 검증 정확도: {best*100:.1f}%")
     print(f"모델 저장: {KERAS_MODEL}")
@@ -137,7 +138,7 @@ def main():
         print("  1) python src/dataset.py 로 단어별 개수가 150개 이상인지")
         print("  2) python src/evaluate.py 로 어떤 단어끼리 헷갈리는지")
         print("  3) 헷갈리는 두 단어는 동작이 실제로 비슷한 것이므로 하나를 교체")
-    if best > 0.99:
+    if best > 0.99 and not args.holdout:
         print("\n[주의] 99% 이상이면 의심해야 합니다.")
         print("  같은 촬영본이 학습과 검증에 함께 들어갔을 수 있습니다.")
         print("  python src/train.py --holdout <이름> 으로 다시 확인하세요.")

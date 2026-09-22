@@ -39,7 +39,7 @@ from landmarker import Landmarker, open_camera
 from sampler import FrameSampler
 
 # 손이 하나도 안 잡힌 프레임이 이 비율을 넘으면 저장하지 않고 다시 찍게 한다
-MAX_EMPTY_RATIO = 0.30
+MAX_EMPTY_RATIO = 0.60
 
 
 def draw_guide(frame, text_lines, color=(255, 255, 255)):
