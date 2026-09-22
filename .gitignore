@@ -2,8 +2,11 @@ venv/
 __pycache__/
 *.pyc
 data/
-models/
 *.npy
-*.keras
 .DS_Store
 .vscode/
+
+# models 폴더는 막되, 학습된 모델과 학습 기록만 올린다
+models/*
+!models/sign_model.keras
+!models/train_report.json
