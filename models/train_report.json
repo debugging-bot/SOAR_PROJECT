@@ -1,8 +1,8 @@
 {
   "tensorflow": "2.20.0",
   "num_classes": 10,
-  "train_size": 960,
-  "val_size": 60,
+  "train_size": 2400,
+  "val_size": 150,
   "augment": 3,
   "holdout": null,
   "best_val_accuracy": 1.0
