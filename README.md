@@ -65,6 +65,7 @@ python tests/smoke_test.py    # 실패 0개여야 함
 | 실시간 인식 (콘솔) | `python src/realtime.py` |
 | 전체 시스템 (브라우저) | `python src/server.py` → http://localhost:8000 |
 | 화면만 먼저 보기 | `python src/server.py --demo` |
+| 테스트 메뉴 (Windows) | `run_test.bat` 더블클릭, push 전 점검은 `run_test.bat 1` |
 
 ---
 

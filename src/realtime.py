@@ -3,7 +3,7 @@ realtime.py — 웹캠 앞에서 실시간으로 단어를 인식한다. (조원
 
 서버도 브라우저도 필요 없는 가장 단순한 버전이다.
 9주차 완료 기준("웹캠 앞에서 수어를 하면 단어가 한 번만 출력된다")을
-이 파일 하나로 확인한다. 10주차에 이 로직을 server.py가 그대로 가져다 쓴다.
+이 파일 하나로 확인한다. 추론 규칙은 engine.py에 있고 server.py도 같은 엔진을 쓴다.
 
 실행
     python src/realtime.py
@@ -12,6 +12,7 @@ realtime.py — 웹캠 앞에서 실시간으로 단어를 인식한다. (조원
 조작
     q : 종료
     r : 버퍼 초기화
+    d : 인식 점 표시 켜기/끄기 (손·상체·손목 범위·가이드 프레임, overlay.py)
 """
 
 import argparse
@@ -24,12 +25,13 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config import (CONF_THRESHOLD, CONSECUTIVE_N, FEATURE_DIM, FRAME_STRIDE,
-                    KERAS_MODEL, MIRROR, PREDICT_EVERY, SEQ_LEN)
-from confirm import Confirmer
-from features import build_feature_vector, hand_detected_count
+from config import (CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR,
+                    PREDICT_EVERY, SEQ_LEN)
+from engine import RecognitionEngine, load_keras_predict
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
+from overlay import LEGEND, draw_overlay
+from person import MAX_HANDS_SCAN, MAX_PEOPLE, PrimaryUserSelector
 from sampler import FrameSampler
 
 # ---------------------------------------------------------------- 한글 그리기
@@ -79,27 +81,26 @@ def main():
         print("먼저 데이터를 모으고(python src/collect.py) 학습하세요(python src/train.py).")
         return 1
 
-    from tensorflow import keras
     print("모델 불러오는 중...")
-    model = keras.models.load_model(KERAS_MODEL)
+    predict = load_keras_predict()
 
     words = load_labels()
     disp = id_to_display(words)
 
     cap = open_camera()
-    lm = Landmarker()
-    confirmer = Confirmer(threshold=args.threshold)
+    lm = Landmarker(max_hands=MAX_HANDS_SCAN, max_poses=MAX_PEOPLE)
+    engine = RecognitionEngine(predict, threshold=args.threshold,
+                               every=args.every, landmarker=lm,
+                               selector=PrimaryUserSelector())
 
-    sampler = FrameSampler()
-    frame_no = 0
     fps_t, fps_n, fps = time.time(), 0, 0.0
-    top_id, top_conf = -1, 0.0
     history: list[str] = []
     banner, banner_until = "", 0.0
+    show_points = True
 
     print(f"인식 창 {FrameSampler.window_seconds():.1f}초 "
           f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
-    print("준비 완료. 카메라 앞에서 수어를 해 보세요. (q=종료)")
+    print("준비 완료. 카메라 앞에서 수어를 해 보세요. (q=종료, d=점 표시 켜기/끄기)")
     try:
         while True:
             ok, frame = cap.read()
@@ -107,52 +108,37 @@ def main():
                 break
             if MIRROR:
                 frame = cv2.flip(frame, 1)
-            frame_no += 1
 
-            hands, pose = lm.process(frame)
-            vec = build_feature_vector(hands, pose)
-            taken = sampler.offer(vec)
-
-            # 손이 오래 안 잡히면 이전 기록을 버린다 (엉뚱한 확정 방지)
-            if hand_detected_count(vec) == 0:
-                if sampler.full() and all(
-                        hand_detected_count(v) == 0 for v in sampler.recent(10)):
-                    confirmer.reset()
-
-            if taken and sampler.full() and sampler.taken % args.every == 0:
-                x = sampler.array()[np.newaxis, ...]               # (1,30,146)
-                prob = model.predict(x, verbose=0)[0]
-                top_id, top_conf = int(np.argmax(prob)), float(np.max(prob))
-
-                confirmed = confirmer.update(top_id, top_conf)
-                if confirmed is not None:
-                    text = disp.get(confirmed, str(confirmed))
-                    history.append(text)
-                    banner, banner_until = text, time.time() + 2.0
-                    print(f"  >>> 확정: {text}  (확신도 {top_conf:.2f})")
+            res = engine.step(frame)
+            if res.confirmed is not None:
+                text = disp.get(res.confirmed, str(res.confirmed))
+                history.append(text)
+                banner, banner_until = text, time.time() + 2.0
+                print(f"  >>> 확정: {text}  (확신도 {res.conf:.2f})")
 
             # ---------------- 화면 ----------------
-            for hand in hands:
-                for (x_, y_, _z) in hand:
-                    cv2.circle(frame, (int(x_ * frame.shape[1]),
-                                       int(y_ * frame.shape[0])),
-                               3, (0, 220, 120), -1)
+            # 인식에 쓰는 점 전부 (손·상체·손목 범위·가이드 프레임). d 키로 끄고 켠다
+            draw_overlay(frame, res.hands, engine.selector, full=show_points)
+            if show_points:
+                cv2.putText(frame, LEGEND, (10, frame.shape[0] - 16),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
             fps_n += 1
             if time.time() - fps_t >= 1.0:
                 fps, fps_n, fps_t = fps_n / (time.time() - fps_t), 0, time.time()
 
-            state = ("WAIT" if hand_detected_count(vec) == 0
-                     else ("READING" if confirmer.progress > 0 else "READY"))
             color = {"WAIT": (120, 120, 120), "READY": (0, 200, 255),
-                     "READING": (0, 255, 0)}[state]
-            cv2.putText(frame, f"{state}  fps={fps:4.1f}  buf={len(sampler)}/{SEQ_LEN}",
+                     "READING": (0, 255, 0)}[res.status]
+            cv2.putText(frame, f"{res.status}  fps={fps:4.1f}  "
+                               f"buf={len(engine.sampler)}/{SEQ_LEN}  "
+                               f"infer={engine.infer_ms:.0f}ms  "
+                               f"people={engine.selector.n_people}",
                         (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
-            if top_id >= 0:
-                cv2.putText(frame, f"top=id{top_id} conf={top_conf:.2f}",
+            if res.top_id >= 0:
+                cv2.putText(frame, f"top=id{res.top_id} conf={res.top_conf:.2f}",
                             (10, 48), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
             # 확정까지 얼마나 남았는지 게이지
-            g = int(frame.shape[1] * confirmer.progress)
+            g = int(frame.shape[1] * res.progress)
             cv2.rectangle(frame, (0, frame.shape[0] - 8), (g, frame.shape[0]),
                           (0, 255, 0), -1)
 
@@ -165,8 +151,9 @@ def main():
             if key == ord("q"):
                 break
             if key == ord("r"):
-                sampler.reset()
-                confirmer.reset()
+                engine.reset()
+            if key == ord("d"):
+                show_points = not show_points
     finally:
         cap.release()
         lm.close()

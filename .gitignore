@@ -10,3 +10,8 @@ data/
 models/*
 !models/sign_model.keras
 !models/train_report.json
+
+
+*.docx
+*.xlsx
+*.pptx
