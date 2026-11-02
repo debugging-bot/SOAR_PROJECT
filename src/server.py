@@ -49,7 +49,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from config import CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR, SEQ_LEN
-from engine import RecognitionEngine, load_keras_predict
+from engine import RecognitionEngine, label_mismatch, load_keras_predict
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
 from overlay import draw_overlay
@@ -167,6 +167,10 @@ class Worker:
                 with LOCK:
                     STATE["model"] = "ready"
                 print("[worker] 모델 준비 완료")
+                msg = label_mismatch(predict, len(self.disp))
+                if msg:                                     # 동작은 계속하되 화면에 알린다
+                    set_error("model", msg)
+                    print(f"[worker] {msg}")
             except FileNotFoundError as e:
                 with LOCK:
                     STATE["model"] = "missing"
@@ -506,7 +510,10 @@ def main():
                     auto_start=args.auto_start)
     print(f"\n브라우저에서 http://localhost:{args.port} 를 여세요. (종료: Ctrl+C)\n")
     # 영상·인식 결과가 PC 밖으로 나가지 않도록 이 PC 안에서만 접속을 받는다 (설계 원칙)
-    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning")
+    # /video 영상 스트림은 끝나지 않으므로, 브라우저가 열려 있으면 Ctrl+C를 눌러도
+    # 연결이 끝나기를 영영 기다린다. 2초만 기다리고 끊는다.
+    uvicorn.run(app, host="127.0.0.1", port=args.port, log_level="warning",
+                timeout_graceful_shutdown=2)
     return 0
 
 

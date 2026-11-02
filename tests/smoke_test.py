@@ -141,8 +141,13 @@ try:
     ok("불러온 개수", len(yd) == 12, f"{len(yd)}개")
     ok("배열 shape", Xd.shape == (12, SEQ_LEN, FEATURE_DIM), f"{Xd.shape}")
     ok("촬영자 파싱", meta[0]["person"] == "kim" and meta[0]["speed"] == "normal")
-    Xtr, Xva, ytr, yva = ds.split_random(Xd, yd, val_ratio=0.25)
-    ok("학습/검증 분할", len(ytr) == 9 and len(yva) == 3, f"{len(ytr)}/{len(yva)}")
+    try:
+        import sklearn  # noqa: F401  split_random이 안에서 쓴다
+    except Exception as e:                  # noqa: BLE001  깨진 설치는 ImportError가 아닌 ValueError 등
+        print(f"[skip] 학습/검증 분할 생략 (scikit-learn을 불러오지 못함: {e})")
+    else:
+        Xtr, Xva, ytr, yva = ds.split_random(Xd, yd, val_ratio=0.25)
+        ok("학습/검증 분할", len(ytr) == 9 and len(yva) == 3, f"{len(ytr)}/{len(yva)}")
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 
@@ -232,18 +237,22 @@ print()
 print("=" * 60)
 print("6. 모델 (TensorFlow가 있을 때만)")
 print("=" * 60)
+tf_imported = False
 try:
     import tensorflow  # noqa: F401
     from labels import load_labels
     from train import build_model
+    tf_imported = True
     n_cls = len(load_labels())
     m = build_model(n_cls)
     out = m.predict(np.zeros((2, SEQ_LEN, FEATURE_DIM), dtype=np.float32), verbose=0)
     ok("labels.json 클래스 수", n_cls > 0, f"{n_cls}개")
     ok("모델 출력 shape", out.shape == (2, n_cls), f"{out.shape}")
     ok("확률 합 = 1", np.allclose(out.sum(axis=1), 1.0, atol=1e-4))
-except ImportError:
-    print("[skip] TensorFlow 미설치 — 학습 담당(조원 3)만 확인하면 됩니다")
+except Exception as e:                      # noqa: BLE001  깨진 설치는 ImportError가 아닌 ValueError 등
+    if tf_imported:     # 점검 도중에 난 오류는 생략하지 않고 그대로 실패로 드러낸다
+        raise
+    print(f"[skip] TensorFlow를 불러오지 못함 ({type(e).__name__}) — 학습 담당(조원 3)만 확인하면 됩니다")
 
 print()
 print("=" * 60)
@@ -317,14 +326,17 @@ print()
 print("=" * 60)
 print("8. 서버 API (FastAPI가 있을 때만, 카메라 없이)")
 print("=" * 60)
+server_imported = False
 try:
     import threading  # noqa: E402
     import time  # noqa: E402
 
+    # httpx2(또는 httpx)가 없으면 starlette가 ImportError가 아니라 RuntimeError를 낸다
     from fastapi.testclient import TestClient  # noqa: E402
 
     import server  # noqa: E402
     from labels import load_labels as _ll  # noqa: E402
+    server_imported = True
 
     def wait_until(cond, timeout=5.0):
         end = time.time() + timeout
@@ -468,8 +480,10 @@ try:
     finally:
         server.STATE["running"] = False
         th.join(timeout=2.0)
-except ImportError as e:
-    print(f"[skip] 서버 점검 생략 ({e}) — pip install fastapi httpx")
+except (ImportError, RuntimeError) as e:
+    if server_imported:     # 점검 도중에 난 오류는 생략하지 않고 그대로 실패로 드러낸다
+        raise
+    print(f"[skip] 서버 점검 생략 ({e}) — pip install -r requirements.txt")
 
 print()
 print("=" * 60)

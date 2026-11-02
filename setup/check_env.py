@@ -34,13 +34,17 @@ def check(name, fn, fix=""):
 # ------------------------------------------------------------- 1. 파이썬
 def c_python():
     v = sys.version_info
-    if v.major != 3 or not (9 <= v.minor <= 12):
+    if v.major != 3 or v.minor < 11:
+        raise RuntimeError(f"파이썬 {v.major}.{v.minor} 에서는 학습된 모델 파일이 열리지 않습니다 "
+                           "(Keras 3.15가 3.11 이상 필요)")
+    if v.minor > 12:
         raise RuntimeError(f"파이썬 {v.major}.{v.minor} 은(는) MediaPipe 지원 밖입니다")
     return f"(python {v.major}.{v.minor}.{v.micro})"
 
 
 check("파이썬 버전", c_python,
       "python.org에서 3.11을 설치하고 가상환경을 다시 만드세요.\n"
+      "  py -3.11 -m venv venv  ->  venv\\Scripts\\activate  ->  pip install -r requirements.txt\n"
       "3.13 이상은 MediaPipe 설치 파일이 아직 없습니다.")
 
 
@@ -89,6 +93,27 @@ def c_models():
 
 
 check("MediaPipe 모델 파일", c_models, "python setup/download_models.py")
+
+
+def c_sign_model():
+    # 파일이 있어도 Keras 버전이 다르면 열리지 않는다. 실제로 열어 보고 단어 수까지 확인한다
+    import json
+    import keras
+    from config import KERAS_MODEL, LABELS_PATH
+    if not KERAS_MODEL.exists():
+        raise FileNotFoundError(f"{KERAS_MODEL.name} 없음")
+    model = keras.models.load_model(KERAS_MODEL)
+    n_model = int(model.output_shape[-1])
+    n_labels = len(json.loads(LABELS_PATH.read_text(encoding="utf-8"))["words"])
+    if n_model != n_labels:
+        raise RuntimeError(f"모델 단어 수 {n_model}개와 labels.json 단어 수 {n_labels}개가 다릅니다")
+    return f"(keras {keras.__version__}, 단어 {n_model}개)"
+
+
+check("학습 모델 열기", c_sign_model,
+      "파일이 없으면: git pull 로 models/sign_model.keras 를 받으세요.\n"
+      "열리지 않으면: 파이썬 3.11 가상환경에서 pip install -r requirements.txt (keras 3.15 이상)\n"
+      "단어 수가 다르면: labels.json을 바꾼 뒤 재학습이 필요합니다 (조원 3).")
 
 
 # ------------------------------------------------------------- 4. 우리 코드
