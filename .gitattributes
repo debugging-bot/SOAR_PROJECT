@@ -1,0 +1,3 @@
+# .bat은 줄바꿈이 CRLF여야 cmd에서 goto·라벨이 제대로 동작한다.
+# git 설정(core.autocrlf)과 상관없이 항상 CRLF로 받도록 고정한다.
+*.bat text eol=crlf

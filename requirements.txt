@@ -7,6 +7,7 @@ numpy>=1.26,<3
 opencv-python>=4.9
 mediapipe>=0.10.14
 tensorflow>=2.16,<2.21
+keras>=3.15          # models/sign_model.keras가 Keras 3.15로 저장됨. 3.15는 파이썬 3.11 이상 필요
 scikit-learn>=1.4
 matplotlib>=3.8
 pillow>=10.0
@@ -14,3 +15,4 @@ pillow>=10.0
 fastapi>=0.110
 uvicorn>=0.29
 websockets>=12.0
+httpx2              # tests/smoke_test.py 8번(서버 API 점검)이 쓰는 FastAPI TestClient용

@@ -34,14 +34,15 @@ RELEASE_N = 5
 
 class Confirmer:
     def __init__(self, threshold=CONF_THRESHOLD, n=CONSECUTIVE_N,
-                 cooldown=COOLDOWN_SEC, release_n=RELEASE_N, clock=time.time):
+                 cooldown=COOLDOWN_SEC, release_n=RELEASE_N, clock=time.monotonic):
+        # monotonic: PC 시간이 자동 동기화로 바뀌어도 쿨다운 계산이 흔들리지 않는다
         self.threshold = threshold
         self.n = n
         self.cooldown = cooldown
         self.release_n = release_n
         self.clock = clock                  # 테스트에서 가짜 시계를 넣기 위함
         self.recent = deque(maxlen=n)
-        self.last_time = 0.0
+        self.last_time = float("-inf")      # 첫 확정은 쿨다운 없이
         self.last_word = None
         self.locked = None                  # 재확정이 잠긴 단어 (없으면 None)
         self.other = 0                      # 잠긴 단어가 아닌 예측의 연속 횟수

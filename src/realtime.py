@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config import (CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR,
                     PREDICT_EVERY, SEQ_LEN)
-from engine import RecognitionEngine, load_keras_predict
+from engine import RecognitionEngine, label_mismatch, load_keras_predict
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
 from overlay import LEGEND, draw_overlay
@@ -86,6 +86,9 @@ def main():
 
     words = load_labels()
     disp = id_to_display(words)
+    msg = label_mismatch(predict, len(words))
+    if msg:
+        print(f"[주의] {msg}")
 
     cap = open_camera()
     lm = Landmarker(max_hands=MAX_HANDS_SCAN, max_poses=MAX_PEOPLE)

@@ -62,7 +62,7 @@ class RecognitionEngine:
     """
 
     def __init__(self, predict_fn=None, threshold=CONF_THRESHOLD,
-                 every=PREDICT_EVERY, landmarker=None, selector=None, clock=time.time):
+                 every=PREDICT_EVERY, landmarker=None, selector=None, clock=time.monotonic):
         self.predict_fn = predict_fn    # (1,30,146) -> (클래스 수,) 확률. None이면 예측 생략
         self.landmarker = landmarker
         self.selector = selector        # person.PrimaryUserSelector. 있으면 주 사용자 손만 쓴다
@@ -141,7 +141,17 @@ def keras_predict_fn(model):
         return np.asarray(model.predict_on_batch(x))[0]
 
     predict(np.zeros((1, SEQ_LEN, FEATURE_DIM), dtype=np.float32))   # warm-up
+    predict.n_classes = int(model.output_shape[-1])   # labels.json 단어 수와 비교용
     return predict
+
+
+def label_mismatch(predict_fn, n_labels):
+    """모델 출력 개수와 labels.json 단어 수가 다르면 안내 문구, 같으면 None."""
+    n_model = getattr(predict_fn, "n_classes", None)
+    if n_model is None or n_model == n_labels:
+        return None
+    return (f"모델 단어 수({n_model}개)와 labels.json 단어 수({n_labels}개)가 다릅니다. "
+            "재학습한 모델로 바꿔 주세요")
 
 
 def load_keras_predict(path=KERAS_MODEL):
