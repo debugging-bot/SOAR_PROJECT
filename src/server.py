@@ -485,6 +485,15 @@ def main():
                     help="시작하기 버튼 없이 바로 인식 (세션 API를 아직 안 쓰는 화면에서 시험할 때)")
     args = ap.parse_args()
 
+    # 모델을 불러오기 전에 포트부터 확인한다 (이전 서버가 켜져 있으면 바로 알려 주고 끝낸다)
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        if s.connect_ex(("127.0.0.1", args.port)) == 0:
+            print(f"[오류] 포트 {args.port}을(를) 이미 다른 프로그램이 쓰고 있습니다.")
+            print(f"       이전에 켠 서버가 남아 있을 가능성이 큽니다: http://localhost:{args.port}")
+            print("       그 서버 창에서 Ctrl+C로 끄고 다시 실행하거나, --port 8001 처럼 다른 포트를 쓰세요.")
+            return 1
+
     if not args.demo and not KERAS_MODEL.exists():
         print(f"[주의] 모델 파일이 없습니다: {KERAS_MODEL}")
         print("       서버는 켜지지만 영상만 보입니다. 화면만 보려면: python src/server.py --demo")

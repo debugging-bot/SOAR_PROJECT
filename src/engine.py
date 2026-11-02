@@ -8,6 +8,7 @@ realtime.py(콘솔)와 server.py(브라우저)는 반드시 같은 추론 규칙
 한 단계에서 하는 일
     프레임 -> Landmarker -> build_feature_vector -> FrameSampler
           -> (손이 충분히 보일 때만) 모델 예측 -> Confirmer
+          -> 확정되면 버퍼를 비우고 그 단어는 재확정 잠금 (confirm.py)
 
 모델 입력 특징(features.py, sampler.py, config.py)은 건드리지 않는다.
 여기서 더한 규칙(손 검출 게이팅)은 예측을 '할지 말지'만 정하므로 데이터 규격과 무관하다.
@@ -103,6 +104,9 @@ class RecognitionEngine:
                 done = self.confirmer.update(self.top_id, self.top_conf)
                 if done is not None:
                     res.confirmed, res.conf = done, self.top_conf
+                    # 방금 확정한 동작이 창에 남아 다시 예측되지 않도록 버퍼를 비운다.
+                    # 다음 예측은 새 표본 30개(약 2초)가 다시 찰 때부터다.
+                    self.sampler.reset()
 
         res.top_id, res.top_conf = self.top_id, self.top_conf
         res.progress = self.confirmer.progress

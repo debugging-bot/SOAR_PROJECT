@@ -77,6 +77,13 @@ python src\realtime.py
 goto next
 
 :server
+curl -s -o nul %URL%/health
+if not errorlevel 1 (
+    echo [주의] 서버가 이미 켜져 있습니다: %URL%
+    echo        코드를 고친 뒤라면 기존 서버 창에서 Ctrl+C로 끄고 다시 4번을 고르세요.
+    start "" %URL%
+    goto next
+)
 echo 서버를 새 창에서 켭니다. 끄려면 그 창에서 Ctrl+C.
 start "SOAR server" cmd /k python src\server.py --auto-start --debug --port %PORT%
 echo 서버 준비를 기다리는 중 (모델 불러오기에 10초 이상 걸릴 수 있음)...

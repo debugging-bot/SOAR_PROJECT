@@ -164,9 +164,27 @@ res2 = [c.update(3, 0.95) for _ in range(5)]
 ok("쿨다운 중에는 다시 확정 안 됨", all(r is None for r in res2))
 
 t[0] += 2.0
-res3 = [c.update(3, 0.95) for _ in range(5)]
-# 쿨다운 동안에도 연속 기록은 쌓여 있으므로, 시간이 지나자마자 확정된다
-ok("쿨다운이 지나면 다시 확정", res3.count(3) == 1, f"{res3}")
+res3 = [c.update(3, 0.95) for _ in range(20)]
+ok("쿨다운이 지나도 같은 단어는 잠겨서 재확정 안 됨",
+   all(r is None for r in res3) and c.progress == 0, f"progress={c.progress}")
+
+c.reset()                                           # 손을 내림
+res4 = [c.update(3, 0.95) for _ in range(5)]
+ok("손을 내렸다 다시 하면 같은 단어 재확정", res4[-1] == 3, f"{res4}")
+
+t[0] += 3.0
+for _ in range(4):
+    c.update(3, 0.40)                               # 확률이 잠깐 떨어짐 (4번)
+blip = [c.update(3, 0.95) for _ in range(5)]
+ok("확률이 잠깐 떨어진 정도로는 잠금 유지", all(r is None for r in blip), f"{blip}")
+for _ in range(5):
+    c.update(7, 0.40)                               # 다른 동작이 5번 연속
+res5 = [c.update(3, 0.95) for _ in range(5)]
+ok("다른 동작이 이어진 뒤에는 같은 단어 재확정", res5[-1] == 3, f"{res5}")
+
+t[0] += 3.0
+res6 = [c.update(5, 0.95) for _ in range(5)]
+ok("다른 단어는 잠금과 무관하게 확정", res6[-1] == 5, f"{res6}")
 
 c.reset()
 mixed = [c.update(i % 2, 0.95) for i in range(10)]
@@ -264,6 +282,29 @@ for _ in range(10 * FRAME_STRIDE):
     r = eng2.feed(empty_vec)
 ok("손이 사라지면 진행률이 0으로", before > 0 and r.progress == 0 and r.status == "WAIT",
    f"{before:.1f} -> {r.progress:.1f}")
+
+# 실제 시간 흐름(30fps)으로 같은 동작을 계속 유지했을 때 (10주차 피드백 4)
+tt = [5000.0]
+eng4 = RecognitionEngine(fake_predict, threshold=0.85, clock=lambda: tt[0])
+
+
+def run_frames(vec, sec):
+    out = []
+    for _ in range(int(sec * 30)):
+        tt[0] += 1 / 30
+        r = eng4.feed(vec)
+        if r.confirmed is not None:
+            out.append(r.confirmed)
+    return out
+
+
+hold = run_frames(hand_vec, 5.0)
+ok("동작 유지 5초 = 확정 1회", hold == [4], f"{hold}")
+hold2 = run_frames(hand_vec, 5.0)
+ok("10초까지 계속 유지해도 추가 확정 없음", hold2 == [], f"{hold2}")
+run_frames(empty_vec, 1.0)
+again = run_frames(hand_vec, 5.0)
+ok("손을 내렸다 다시 하면 다시 확정", again == [4], f"{again}")
 
 # 손이 안 잡힌 표본이 60%를 넘는 창은 학습 데이터에 없으므로 예측하지 않는다
 eng3 = RecognitionEngine(fake_predict, threshold=0.85, clock=lambda: 1000.0)
