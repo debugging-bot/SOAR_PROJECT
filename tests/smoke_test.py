@@ -229,6 +229,209 @@ except ImportError:
 
 print()
 print("=" * 60)
+print("7. 실시간 엔진 (카메라·모델 없이)")
+print("=" * 60)
+
+from engine import RecognitionEngine  # noqa: E402
+
+hand_vec = build_feature_vector([fake_hand()], fake_pose())
+empty_vec = build_feature_vector([], fake_pose())
+calls = [0]
+
+
+def fake_predict(x, cid=4):
+    calls[0] += 1
+    p = np.full(10, 0.01, dtype=np.float32)
+    p[cid] = 0.91
+    return p
+
+
+eng = RecognitionEngine(fake_predict, threshold=0.85, clock=lambda: 1000.0)
+for _ in range(200):
+    eng.feed(empty_vec)
+ok("손이 없으면 예측 함수를 부르지 않는다", calls[0] == 0, f"호출 {calls[0]}회")
+
+eng.reset()
+got = [r.confirmed for r in (eng.feed(hand_vec) for _ in range(300)) if r.confirmed is not None]
+ok("같은 단어가 계속 나오면 정확히 1번 확정", got == [4], f"{got}")
+ok("예측 1회 시간 기록", eng.infer_ms >= 0.0, f"{eng.infer_ms:.3f}ms")
+
+eng2 = RecognitionEngine(fake_predict, threshold=0.85, clock=lambda: 1000.0)
+for _ in range(SEQ_LEN * FRAME_STRIDE + 2):
+    eng2.feed(hand_vec)
+before = eng2.confirmer.progress
+for _ in range(10 * FRAME_STRIDE):
+    r = eng2.feed(empty_vec)
+ok("손이 사라지면 진행률이 0으로", before > 0 and r.progress == 0 and r.status == "WAIT",
+   f"{before:.1f} -> {r.progress:.1f}")
+
+# 손이 안 잡힌 표본이 60%를 넘는 창은 학습 데이터에 없으므로 예측하지 않는다
+eng3 = RecognitionEngine(fake_predict, threshold=0.85, clock=lambda: 1000.0)
+calls[0] = 0
+for i in range(300):
+    eng3.feed(hand_vec if i % 3 == 0 else empty_vec)    # 손 1/3만 보임
+ok("손이 거의 안 보이는 창은 예측 생략", calls[0] == 0, f"호출 {calls[0]}회")
+
+print()
+print("=" * 60)
+print("8. 서버 API (FastAPI가 있을 때만, 카메라 없이)")
+print("=" * 60)
+try:
+    import threading  # noqa: E402
+    import time  # noqa: E402
+
+    from fastapi.testclient import TestClient  # noqa: E402
+
+    import server  # noqa: E402
+    from labels import load_labels as _ll  # noqa: E402
+
+    def wait_until(cond, timeout=5.0):
+        end = time.time() + timeout
+        while time.time() < end:
+            if cond():
+                return True
+            time.sleep(0.02)
+        return False
+
+    app = server.build_app(demo=True, threshold=0.85, start_worker=False)
+    with TestClient(app) as cli:
+        lab = cli.get("/api/labels").json()
+        ok("/api/labels 단어 수 = labels.json", len(lab["words"]) == len(_ll()),
+           f"{len(lab['words'])}개")
+        st = cli.get("/api/status").json()
+        need = {"status", "fps", "camera_connected", "model", "session_active", "error", "boot_id"}
+        ok("/api/status 필드", need <= set(st), f"{sorted(need - set(st)) or 'OK'}")
+        ok("시작하기 전에는 세션 꺼짐 (S00)",
+           st["session_active"] is False and st["status"] == "IDLE")
+
+        with server.LOCK:
+            server.STATE["seq"] = 2
+            server.STATE["events"] = [{"seq": 1, "word": "네"}, {"seq": 2, "word": "아니요"}]
+        with cli.websocket_connect("/ws") as w:
+            first = w.receive_json()
+        ok("WS 재연결 시 지난 단어를 다시 보내지 않는다", first["words"] == [], f"{first['words']}")
+        with cli.websocket_connect(f"/ws?boot={server.BOOT_ID}&since=1") as w:
+            first = w.receive_json()
+        ok("WS since 이후 단어만 받는다", [e["seq"] for e in first["words"]] == [2])
+
+        r = cli.post("/api/session", json={"action": "stop"}).json()
+        ok("세션 종료 -> 인식 중지 + 이력 비움",
+           r["session_active"] is False and server.STATE["events"] == [])
+        r = cli.post("/api/session", json={"action": "start"}).json()
+        ok("세션 시작", r["session_active"] is True)
+        ok("잘못된 세션 요청은 422", cli.post("/api/session", json={"action": "x"}).status_code == 422)
+
+    # 가짜 카메라로 워커의 끊김·복구·오류 재시작을 확인한다
+    class FakeCam:
+        def __init__(self, plug):
+            self.plug = plug
+
+        def read(self):
+            time.sleep(0.005)
+            if not self.plug[0]:
+                return False, None
+            return True, np.zeros((120, 160, 3), np.uint8)
+
+        def release(self):
+            pass
+
+    class FakeLm:
+        def process(self, frame):
+            return [fake_hand()], fake_pose()
+
+        def close(self):
+            pass
+
+    plug = [False]
+    opened = [0]
+
+    def fake_open():
+        opened[0] += 1
+        if not plug[0]:
+            raise RuntimeError("가짜 카메라 없음")
+        return FakeCam(plug)
+
+    server.build_app(demo=False, threshold=0.85, start_worker=False)   # STATE 초기화
+    wk = server.Worker(False, 0.85, open_cam=fake_open, make_landmarker=FakeLm,
+                       load_predict=lambda: fake_predict, retry_sec=0.05,
+                       fail_limit=5, crash_backoff=0.05)
+    th = threading.Thread(target=wk.run, daemon=True)
+    th.start()
+    try:
+        time.sleep(0.3)
+        ok("시작하기 전에는 카메라를 열지 않는다", opened[0] == 0, f"열기 {opened[0]}회")
+        server.STATE["session"] = True
+        ok("카메라 없이 시작 -> CAMERA_ERROR + 안내", wait_until(
+            lambda: server.snapshot()["status"] == "CAMERA_ERROR"
+            and "카메라" in (server.snapshot()["error"] or "")))
+        plug[0] = True
+        ok("카메라 연결 -> 오류 해제", wait_until(
+            lambda: server.snapshot()["camera_connected"] and server.snapshot()["error"] is None))
+        ok("가짜 카메라로 단어 확정", wait_until(lambda: server.STATE["seq"] >= 1),
+           f"seq={server.STATE['seq']}")
+        plug[0] = False
+        ok("실행 중 분리 -> 끊김 안내", wait_until(
+            lambda: not server.snapshot()["camera_connected"]
+            and "끊겼" in (server.snapshot()["error"] or "")))
+        plug[0] = True
+        ok("다시 꽂으면 자동 복구", wait_until(lambda: server.snapshot()["camera_connected"]))
+        server.STATE["fault_req"] = True
+        ok("워커 내부 오류 -> 안내", wait_until(
+            lambda: "일시적" in (server.snapshot()["error"] or "")))
+        ok("워커 오류 후 자동 재시작", wait_until(
+            lambda: server.snapshot()["error"] is None) and th.is_alive())
+        server.STATE["session"] = False
+        ok("종료하기 -> 카메라 끄고 IDLE (S07)", wait_until(
+            lambda: server.snapshot()["status"] == "IDLE"
+            and not server.snapshot()["camera_connected"]))
+        server.STATE["session"] = True
+        ok("다시 시작하기 -> 카메라 다시 연결", wait_until(
+            lambda: server.snapshot()["camera_connected"]))
+    finally:
+        server.STATE["running"] = False
+        th.join(timeout=2.0)
+
+    server.build_app(demo=False, threshold=0.85, start_worker=False, auto_start=True)
+
+    def no_model():
+        raise FileNotFoundError("없음")
+    plug[0] = True
+    wk = server.Worker(False, 0.85, open_cam=fake_open, make_landmarker=FakeLm,
+                       load_predict=no_model, retry_sec=0.05)
+    th = threading.Thread(target=wk.run, daemon=True)
+    th.start()
+    try:
+        ok("모델 파일 없음 -> 서버 유지 + 안내", wait_until(
+            lambda: server.snapshot()["model"] == "missing"
+            and server.snapshot()["camera_connected"]
+            and "모델" in (server.snapshot()["error"] or "")))
+    finally:
+        server.STATE["running"] = False
+        th.join(timeout=2.0)
+
+    # 카메라가 없는 동안 난 워커 오류도 지워져야 한다 (카메라 안내만 남음)
+    server.build_app(demo=False, threshold=0.85, start_worker=False, auto_start=True)
+    plug[0] = False
+    wk = server.Worker(False, 0.85, open_cam=fake_open, make_landmarker=FakeLm,
+                       load_predict=lambda: fake_predict, retry_sec=0.05,
+                       crash_backoff=0.05)
+    th = threading.Thread(target=wk.run, daemon=True)
+    th.start()
+    try:
+        wait_until(lambda: server.snapshot()["status"] == "CAMERA_ERROR")
+        server.STATE["fault_req"] = True
+        seen_fault = wait_until(lambda: "일시적" in (server.snapshot()["error"] or ""))
+        ok("카메라 없을 때 워커 오류 -> 오류만 해제, 카메라 안내 유지", seen_fault and wait_until(
+            lambda: "일시적" not in (server.snapshot()["error"] or "")
+            and "카메라" in (server.snapshot()["error"] or "")))
+    finally:
+        server.STATE["running"] = False
+        th.join(timeout=2.0)
+except ImportError as e:
+    print(f"[skip] 서버 점검 생략 ({e}) — pip install fastapi httpx")
+
+print()
+print("=" * 60)
 print(f"통과 {passed}개 / 실패 {failed}개")
 print("=" * 60)
 raise SystemExit(1 if failed else 0)
