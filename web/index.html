@@ -1,211 +1,790 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TeamMate 수어 번역</title>
-<style>
-  /* 고령 사용자 기준: 2m 거리에서 읽히는 글씨, 명암 대비 최소 7:1 */
-  :root{
-    --ink:#101418;        /* 본문 글자 */
-    --paper:#FFFFFF;      /* 배경 */
-    --muted:#6B7280;      /* 보조 글자 */
-    --line:#D9DEE5;
-    --wait:#9AA3AE;       /* 대기 */
-    --reading:#E08A00;    /* 인식 중 */
-    --done:#0F8A3D;       /* 확정 */
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
-  body{
-    background:var(--paper); color:var(--ink);
-    font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
-    display:flex; flex-direction:column; overflow:hidden;
-  }
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SLink — 수어로 잇는 대화</title>
 
-  /* ── 상단: 카메라 + 상태 ─────────────────────────── */
-  header{display:flex; align-items:stretch; border-bottom:2px solid var(--line);}
-  #cam{width:320px; height:240px; object-fit:cover; background:#000; flex:none;}
-  .status{flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 28px; gap:10px;}
-  .dot-row{display:flex; align-items:center; gap:14px;}
-  .dot{width:26px;height:26px;border-radius:50%;background:var(--wait);flex:none}
-  .dot.reading{background:var(--reading)}
-  .dot.done{background:var(--done)}
-  #statusText{font-size:30px; font-weight:700;}
-  #hint{font-size:20px; color:var(--muted);}
-  .bar{height:14px;background:var(--line);border-radius:7px;overflow:hidden}
-  .bar > i{display:block;height:100%;width:0;background:var(--reading);transition:width .1s linear}
-
-  /* ── 중앙: 확정된 단어 (이 화면의 주인공) ───────────── */
-  main{flex:1; display:flex; align-items:center; justify-content:center; padding:12px 24px; min-height:0;}
-  #word{
-    font-size:clamp(72px, 15vw, 220px); font-weight:800; line-height:1.05;
-    letter-spacing:-0.02em; text-align:center; word-break:keep-all;
-  }
-  #word.placeholder{font-size:clamp(28px,4vw,44px); font-weight:600; color:var(--muted);}
-  #word.flash{animation:pop .35s ease-out}
-  @keyframes pop{from{transform:scale(.94);opacity:.4} to{transform:scale(1);opacity:1}}
-  @media (prefers-reduced-motion: reduce){ #word.flash{animation:none} }
-
-  /* ── 하단: 대화 이력 + 빠른 단어 ───────────────────── */
-  footer{border-top:2px solid var(--line);}
-  #history{display:flex; gap:12px; padding:14px 20px; overflow-x:auto; min-height:78px; align-items:center;}
-  #history:empty::after{content:"인식된 말이 여기에 순서대로 쌓입니다";color:var(--muted);font-size:20px}
-  .chip{
-    flex:none; border:2px solid var(--line); border-radius:14px;
-    padding:10px 20px; font-size:30px; font-weight:700; white-space:nowrap;
-  }
-  .chip.latest{border-color:var(--done); color:var(--done);}
-  #quick{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; padding:0 20px 18px;}
-  #quick button{
-    font:inherit; font-size:28px; font-weight:700; padding:18px 6px; cursor:pointer;
-    background:var(--paper); color:var(--ink); border:3px solid var(--ink); border-radius:16px;
-  }
-  #quick button:active{background:var(--ink); color:var(--paper);}
-  #quick button:focus-visible{outline:5px solid var(--reading); outline-offset:3px;}
-
-  /* ── 시작 화면 (브라우저 음성 허용을 위해 필요) ──────── */
-  #gate{
-    position:fixed; inset:0; background:var(--paper); z-index:10;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:28px; text-align:center; padding:24px;
-  }
-  #gate h1{font-size:clamp(32px,5vw,56px); font-weight:800;}
-  #gate p{font-size:22px; color:var(--muted); max-width:32ch; word-break:keep-all;}
-  #gate button{
-    font:inherit; font-size:40px; font-weight:800; padding:24px 64px; cursor:pointer;
-    border:none; border-radius:20px; background:var(--ink); color:var(--paper);
-  }
-  #err{position:fixed;left:0;right:0;bottom:0;background:#8A1010;color:#fff;
-       font-size:22px;padding:14px 20px;display:none;z-index:20}
-</style>
-</head>
-<body>
-
-<div id="gate">
-  <h1>수어를 한국어로 바꿔 드립니다</h1>
-  <p>화면을 누르면 카메라가 켜집니다. 카메라 앞에서 수어를 하시면 큰 글씨와 음성으로 안내합니다.</p>
-  <button id="start">시작하기</button>
-</div>
-
-<header>
-  <img id="cam" alt="카메라 화면" />
-  <div class="status">
-    <div class="dot-row">
-      <span class="dot" id="dot"></span>
-      <span id="statusText">준비 중</span>
-    </div>
-    <div id="hint">카메라 앞에 서 주세요</div>
-    <div class="bar"><i id="progress"></i></div>
-  </div>
-</header>
-
-<main><div id="word" class="placeholder">카메라 앞에서 수어를 시작하세요</div></main>
-
-<footer>
-  <div id="history"></div>
-  <div id="quick">
-    <button data-say="접수하러 왔어요">접수</button>
-    <button data-say="약 받으러 왔어요">약</button>
-    <button data-say="아파요">아파요</button>
-    <button data-say="도와주세요">도움</button>
-    <button data-say="" id="clear">지우기</button>
-  </div>
-</footer>
-
-<div id="err"></div>
-
-<script>
-const $ = (id) => document.getElementById(id);
-let voiceReady = false;
-
-/* 브라우저는 사용자가 한 번 클릭해야 소리를 낼 수 있다.
-   시작 버튼이 그 역할을 한다. 이 버튼이 없으면 TTS가 조용히 실패한다. */
-$("start").addEventListener("click", () => {
-  try {
-    const warm = new SpeechSynthesisUtterance(" ");
-    warm.lang = "ko-KR";
-    speechSynthesis.speak(warm);
-    voiceReady = true;
-  } catch (e) { /* 음성이 없어도 화면 출력은 계속된다 */ }
-  $("cam").src = "/video";
-  $("gate").style.display = "none";
-  connect();
-});
-
-function speak(text){
-  if (!voiceReady || !text) return;
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "ko-KR";
-  u.rate = 0.85;      // 조금 천천히
-  u.volume = 1.0;
-  speechSynthesis.speak(u);
-}
-
-function showWord(text){
-  const el = $("word");
-  el.classList.remove("placeholder", "flash");
-  void el.offsetWidth;              // 애니메이션 재시작
-  el.textContent = text;
-  el.classList.add("flash");
-
-  const hist = $("history");
-  [...hist.children].forEach(c => c.classList.remove("latest"));
-  const chip = document.createElement("div");
-  chip.className = "chip latest";
-  chip.textContent = text;
-  hist.appendChild(chip);
-  hist.scrollLeft = hist.scrollWidth;
-}
-
-const STATUS = {
-  WAIT:    ["대기 중",   "카메라 앞에 서 주세요",        ""],
-  READY:   ["준비됨",     "이제 수어를 시작하세요",       ""],
-  READING: ["읽는 중",    "그대로 조금만 유지해 주세요",   "reading"],
-};
-
-function connect(){
-  const ws = new WebSocket(`ws://${location.host}/ws`);
-
-  ws.onmessage = (e) => {
-    const d = JSON.parse(e.data);
-
-    if (d.error) {
-      $("err").style.display = "block";
-      $("err").textContent = d.error;
+  <style>
+    /* 설계서의 상태 색상을 한곳에서 관리합니다. */
+    :root {
+      --green: #00685D;
+      --wait: #527484;
+      --ready: #175CD3;
+      --reading: #8B4F00;
+      --error: #B42318;
+      --ink: #172D35;
+      --muted: #52656C;
+      --line: #DCE5E5;
+      --paper: #FFFFFF;
+      --background: #F4F8F7;
     }
 
-    const [label, hint, cls] = STATUS[d.status] || STATUS.WAIT;
-    $("statusText").textContent = label;
-    $("hint").textContent = hint;
-    $("dot").className = "dot " + cls;
-    $("progress").style.width = Math.round((d.progress || 0) * 100) + "%";
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
-    (d.words || []).forEach(w => {
-      showWord(w.word);
-      speak(w.word);
-      $("dot").className = "dot done";
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--ink);
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      line-height: 1.5;
+    }
+
+    button { font: inherit; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: wait; }
+    button:focus-visible {
+      outline: 4px solid var(--ready);
+      outline-offset: 5px;
+    }
+
+    .brand {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--green);
+    }
+
+    .tagline { color: var(--muted); font-size: 18px; }
+
+    .primary, .secondary {
+      min-height: 60px;
+      padding: 14px 30px;
+      border-radius: 14px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .primary {
+      border: 2px solid var(--green);
+      background: var(--green);
+      color: white;
+    }
+
+    .secondary {
+      border: 2px solid var(--green);
+      background: white;
+      color: var(--green);
+    }
+
+
+    .landing {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      text-align: center;
+      gap: 20px;
+    }
+
+    .landing h1 {
+      margin: 24px 0 0;
+      font-size: clamp(36px, 5vw, 64px);
+      line-height: 1.35;
+      word-break: keep-all;
+    }
+
+    .landing p { margin: 0; color: var(--muted); font-size: 22px; }
+    .landing .primary { margin: 16px 0; min-width: 240px; }
+    .privacy { font-size: 17px !important; color: var(--muted); }
+
+    #mainScreen {
+      max-width: 1600px;
+      margin: auto;
+      padding: 24px 32px;
+    }
+
+    .header, .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .header { padding-bottom: 24px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--wait);
+      background: white;
+      border: 1px solid var(--line);
+      padding: 12px 20px;
+      border-radius: 999px;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .badge::before {
+      content: "";
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(300px, 1fr) minmax(0, 1.35fr);
+      gap: 24px;
+    }
+
+    .card {
+      padding: 26px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+    }
+
+    .card h2 { margin: 0 0 18px; font-size: 24px; }
+
+    /* 4:3 영상 영역을 유지해 가이드 좌표와 영상이 일치하게 합니다. */
+    .camera-frame {
+      position: relative;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      border-radius: 16px;
+      background: #182B32;
+    }
+
+    #cam { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+    #guide {
+      position: absolute;
+      border: 3px dashed #FFFFFF;
+      border-radius: 16px;
+      pointer-events: none;
+    }
+
+    #cameraOverlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: #182B32;
+      color: white;
+      text-align: center;
+      font-size: 24px;
+    }
+
+    #cameraHint { color: var(--muted); font-size: 18px; }
+
+    .result {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      min-height: 380px;
+      text-align: center;
+    }
+
+    #resultLabel { margin: 0; color: var(--muted); font-size: 20px; }
+
+    #resultText {
+      margin: 26px 0;
+      font-size: clamp(32px, 4vw, 58px);
+      line-height: 1.35;
+      white-space: pre-line;
+      overflow-wrap: anywhere;
+    }
+
+    #resultText.confirmed {
+      color: var(--green);
+      font-size: clamp(54px, 7vw, 104px);
+      font-weight: 800;
+    }
+
+    #resultHint { margin: 0; font-size: 20px; color: var(--muted); }
+
+    .history { margin-top: 24px; }
+    .history p { color: var(--muted); font-size: 18px; }
+
+    #historyList {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      max-height: 230px;
+      overflow-y: auto;
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .history-item {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      padding: 14px 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      font-size: 25px;
+    }
+
+    .history-item time { color: var(--muted); font-size: 17px; }
+    .history-item.latest {
+      border-color: var(--green);
+      color: var(--green);
+      background: #EDF7F4;
+    }
+
+    .footer {
+      position: sticky;
+      bottom: 0;
+      margin-top: 20px;
+      padding: 16px 0;
+      background: var(--background);
+    }
+
+    /* 오류는 종료 버튼을 가리지 않도록 상단에 표시합니다. */
+    #errorBanner {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      padding: 14px 24px;
+      background: #FFF0ED;
+      border-bottom: 1px solid #F4B4A9;
+      color: var(--error);
+      font-size: 19px;
+    }
+
+    @media (max-width: 850px) {
+      #mainScreen { padding: 20px 16px; }
+      .workspace { grid-template-columns: 1fr; }
+      .header { flex-wrap: wrap; }
+      .card { padding: 20px; }
+      .result { min-height: 300px; }
+      .footer { gap: 12px; }
+      .footer .privacy { max-width: 55%; }
+    }
+
+    /*
+   * 대화 이력 영역 전체 높이를 고정합니다.
+   * 메시지가 늘어나도 페이지 높이는 늘어나지 않습니다.
+   제목과 안내를 포함한 이력 영역의 높이를 고정합니다.
+   */
+  .history {
+    height: 240px;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+
+  .history > h2 {
+    flex: none;
+    margin: 0 0 8px;
+  }
+
+  .history > p {
+    flex: none;
+    margin: 0 0 12px;
+  }
+
+  /* 카드는 여러 줄로 쌓이고, 목록 안에서만 세로 스크롤됩니다. */
+  #historyList {
+    display: flex;
+    flex-wrap: wrap;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    gap: 12px;
+
+    align-content: flex-start;
+    align-items: flex-start;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 4px 6px 4px 2px;
+  }
+
+  /* 각 카드의 높이가 내용 공간에 맞춰 눌리지 않게 합니다. */
+  .history-item {
+    flex: 0 0 auto;
+    min-height: 64px;
+    height: auto;
+    max-width: 100%;
+    padding: 12px 20px;
+    white-space: normal;
+  }
+
+  .history-item strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .history-item time {
+    flex-shrink: 0;
+  }
+  </style>
+</head>
+
+<body>
+<!-- 오류 문구만 담습니다. 다른 화면을 이 안에 넣지 않습니다. -->
+<div id="errorBanner" role="alert" hidden></div>
+
+<section id="startScreen" class="landing">
+  <div>
+    <div class="brand">SLink</div>
+    <div class="tagline">수어로 잇는 대화</div>
+  </div>
+  <h1>편하게 수어로<br>말씀해 주세요</h1>
+  <p>수어로 전한 말을 글씨와 음성으로 전달해요.</p>
+  <button id="start" class="primary" type="button">시작하기</button>
+  <p>시작하기 버튼을 눌러 대화를 시작해 주세요.</p>
+  <p class="privacy">영상은 저장하지 않아요.</p>
+</section>
+
+<main id="mainScreen" hidden>
+  <header class="header">
+    <div>
+      <div class="brand">SLink</div>
+      <div class="tagline">수어로 잇는 대화</div>
+    </div>
+    <div id="statusBadge" class="badge" role="status">대기 중</div>
+  </header>
+
+  <div class="workspace">
+    <section class="card">
+      <h2>내 모습</h2>
+      <div class="camera-frame">
+        <img id="cam" alt="실시간 카메라 미리보기">
+        <div id="guide" hidden></div>
+        <div id="cameraOverlay">카메라를 연결하고 있어요.</div>
+      </div>
+      <p id="cameraHint">손이 가이드 안에 보이도록 서 주세요.</p>
+    </section>
+
+    <section class="card result">
+      <p id="resultLabel">수어로 말씀해 주세요</p>
+      <h1 id="resultText">편하게 수어로
+        말씀해 주세요</h1>
+      <p id="resultHint">준비되면 수어를 시작해 주세요.</p>
+    </section>
+  </div>
+
+  <section class="card history">
+    <h2>지금까지 나눈 말</h2>
+    <p>확실하게 인식된 단어만 표시해요.</p>
+    <p id="historyEmpty">전달된 말이 여기에 쌓여요.</p>
+    <ol id="historyList" aria-label="대화 이력"></ol>
+  </section>
+
+  <footer class="footer">
+    <p class="privacy">영상은 저장하지 않아요.</p>
+    <button id="stop" class="secondary" type="button">종료하기</button>
+  </footer>
+</main>
+
+<section id="endScreen" class="landing" hidden>
+  <div>
+    <div class="brand">SLink</div>
+    <div class="tagline">수어로 잇는 대화</div>
+  </div>
+  <h1>대화가 종료됐어요</h1>
+  <p>함께 이야기해 주셔서 고마워요.</p>
+  <button id="backToStart" class="primary" type="button">처음으로</button>
+  <p>새 대화는 처음으로 돌아가 시작할 수 있어요.</p>
+  <p class="privacy">영상은 저장하지 않아요.</p>
+</section>
+
+<script>
+  const $ = id => document.getElementById(id);
+
+  // 서버 연결과 화면 상태를 별도로 관리합니다.
+  let active = false;
+  let socket = null;
+  let retryTimer = null;
+  let latest = null;
+  let bootId = null;
+  let lastSeq = 0;
+
+  // 확정 단어가 여러 개 도착하면 순서대로 표시하고 읽습니다.
+  let wordQueue = [];
+  let presenting = false;
+  let presentationVersion = 0;
+  let releaseTimer = null;
+  let currentUtterance = null;
+
+  // 요청 도중 화면 상태가 바뀌면 이전 응답을 무시하기 위한 번호입니다.
+  let sessionVersion = 0;
+
+  const STATES = {
+    WAIT: {
+      badge: "대기 중", color: "var(--wait)",
+      text: "편하게 수어로\n말씀해 주세요",
+      hint: "준비되면 수어를 시작해 주세요."
+    },
+    READY: {
+      badge: "준비됐어요", color: "var(--ready)",
+      text: "이제 수어를\n시작해 주세요",
+      hint: "천천히 표현해도 괜찮아요."
+    },
+    READING: {
+      badge: "읽고 있어요", color: "var(--reading)",
+      text: "수어를\n읽고 있어요",
+      hint: "동작이 끝날 때까지 편하게 표현해 주세요."
+    },
+    CAMERA_ERROR: {
+      badge: "카메라 연결 끊김", color: "var(--error)",
+      text: "카메라를\n확인해 주세요",
+      hint: "직원에게 연결 확인을 요청해 주세요."
+    }
+  };
+
+  function showScreen(name) {
+    $("startScreen").hidden = name !== "start";
+    $("mainScreen").hidden = name !== "main";
+    $("endScreen").hidden = name !== "end";
+  }
+
+  function showError(message) {
+    $("errorBanner").textContent = message || "";
+    $("errorBanner").hidden = !message;
+  }
+
+  function resetHistory() {
+    $("historyList").replaceChildren();
+    $("historyEmpty").hidden = false;
+  }
+
+  function renderStatus() {
+    // 확정 출력 중에는 일반 상태 메시지가 화면을 덮지 않습니다.
+    if (!active || presenting) return;
+
+    const state = STATES[latest?.status] || STATES.WAIT;
+    $("statusBadge").textContent = state.badge;
+    $("statusBadge").style.color = state.color;
+    $("resultLabel").textContent = "수어로 말씀해 주세요";
+    $("resultText").className = "";
+    $("resultText").textContent = state.text;
+    $("resultHint").textContent = state.hint;
+  }
+
+  function renderCamera(d) {
+    const cameraError = d.status === "CAMERA_ERROR";
+    const unavailable = cameraError || !d.camera_connected || d.stale;
+
+    $("cameraOverlay").hidden = !unavailable;
+    $("cameraOverlay").textContent = cameraError
+      ? "카메라 화면을 불러올 수 없어요"
+      : d.stale
+        ? "새 카메라 영상을 기다리고 있어요."
+        : "카메라를 연결하고 있어요.";
+
+    $("cameraHint").textContent = cameraError
+      ? "잠시 인식을 멈췄어요."
+      : "손이 가이드 안에 보이도록 서 주세요.";
+
+    const box = d.guide_box;
+    const valid = Array.isArray(box) &&
+      box.length === 4 && box.every(Number.isFinite);
+
+    $("guide").hidden = unavailable || !valid;
+
+    if (valid) {
+      const [x0, y0, x1, y1] = box;
+      Object.assign($("guide").style, {
+        left: `${x0 * 100}%`,
+        top: `${y0 * 100}%`,
+        width: `${(x1 - x0) * 100}%`,
+        height: `${(y1 - y0) * 100}%`
+      });
+    }
+  }
+
+  function addHistory(word) {
+    $("historyEmpty").hidden = true;
+    $("historyList").querySelector(".latest")?.classList.remove("latest");
+
+    const item = document.createElement("li");
+    item.className = "history-item latest";
+
+    const text = document.createElement("strong");
+    text.textContent = word.word;
+
+    const time = document.createElement("time");
+    const date = new Date(
+      Number.isFinite(word.t_confirm) ? word.t_confirm : Date.now()
+    );
+    time.dateTime = date.toISOString();
+    time.textContent = date.toLocaleTimeString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: false
     });
-  };
 
-  ws.onclose = () => {
-    $("statusText").textContent = "연결 끊김";
-    $("hint").textContent = "서버가 꺼졌습니다. 5초 뒤 다시 연결합니다.";
-    setTimeout(connect, 5000);
-  };
-}
+    item.append(text, time);
+    $("historyList").appendChild(item);
+    $("historyList").scrollTop = $("historyList").scrollHeight;
+  }
 
-document.querySelectorAll("#quick button[data-say]").forEach(b => {
-  b.addEventListener("click", () => {
-    const t = b.dataset.say;
-    if (t) { showWord(t); speak(t); }
+  function cancelPresentation() {
+    // 취소된 음성의 onend 등이 나중에 실행돼도 무시합니다.
+    presentationVersion++;
+    clearTimeout(releaseTimer);
+    releaseTimer = null;
+    presenting = false;
+    wordQueue = [];
+    currentUtterance = null;
+
+    if ("speechSynthesis" in window) {
+      speechSynthesis.cancel();
+    }
+  }
+
+  function presentNext() {
+    if (!active || presenting || !wordQueue.length) return;
+
+    const word = wordQueue.shift();
+    presenting = true;
+    const version = ++presentationVersion;
+    const shownAt = Date.now();
+
+    $("statusBadge").textContent = "전달했어요";
+    $("statusBadge").style.color = "var(--green)";
+    $("resultLabel").textContent = "전달된 말";
+    $("resultText").className = "confirmed";
+    $("resultText").textContent = word.word;
+    $("resultHint").textContent = "다음 수어도 이어서 말씀해 주세요.";
+
+    let finishing = false;
+
+    function finish() {
+      if (finishing || version !== presentationVersion) return;
+      finishing = true;
+      clearTimeout(releaseTimer);
+
+      // 음성이 짧거나 실패해도 글씨를 최소 1.5초는 보여 줍니다.
+      releaseTimer = setTimeout(() => {
+        if (!active || version !== presentationVersion) return;
+        presenting = false;
+        currentUtterance = null;
+
+        if (wordQueue.length) presentNext();
+        else renderStatus();
+      }, Math.max(0, 1500 - (Date.now() - shownAt)));
+    }
+
+    if (!("speechSynthesis" in window)) {
+      finish();
+      return;
+    }
+
+    try {
+      const utterance = new SpeechSynthesisUtterance(word.word);
+      currentUtterance = utterance;
+      utterance.lang = "ko-KR";
+      utterance.rate = 0.85;
+      utterance.onend = finish;
+      utterance.onerror = finish;
+
+      // 브라우저에서 음성 완료 이벤트가 오지 않아도 화면이 멈추지 않습니다.
+      releaseTimer = setTimeout(() => {
+        if (version !== presentationVersion) return;
+        speechSynthesis.cancel();
+        finish();
+      }, 12000);
+
+      speechSynthesis.speak(utterance);
+    } catch (error) {
+      finish();
+    }
+  }
+
+  async function requestSession(action) {
+    const response = await fetch("/api/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action })
+    });
+
+    if (!response.ok) {
+      throw new Error(`서버 요청 실패: HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  function closeConnection() {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+
+    // 이전 연결의 콜백이 현재 상태를 바꾸지 못하게 먼저 분리합니다.
+    const oldSocket = socket;
+    socket = null;
+    if (oldSocket) oldSocket.close();
+  }
+
+  function finishSession() {
+    active = false;
+    sessionVersion++;
+    closeConnection();
+    cancelPresentation();
+    $("cam").removeAttribute("src");
+    resetHistory();
+    latest = null;
+    bootId = null;
+    lastSeq = 0;
+    showError(null);
+    showScreen("end");
+  }
+
+  function connect() {
+    if (!active || socket) return;
+
+    const protocol = location.protocol === "https:" ? "wss" : "ws";
+
+    // 재연결 시 과거 음성을 재생하지 않도록 기본 연결을 사용합니다.
+    const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+    socket = ws;
+
+    ws.onmessage = event => {
+      if (!active || socket !== ws) return;
+
+      let d;
+      try {
+        d = JSON.parse(event.data);
+      } catch {
+        showError("서버 응답을 읽지 못했습니다.");
+        return;
+      }
+
+      if (d.session_active === false) {
+        finishSession();
+        return;
+      }
+
+      // 서버가 재시작하면 확정 번호도 새로 관리합니다.
+      if (d.boot_id !== bootId) {
+        bootId = d.boot_id;
+        lastSeq = 0;
+      }
+
+      latest = d;
+      showError(d.error);
+      renderCamera(d);
+
+      // 오류 화면은 확정 표시보다 우선합니다.
+      if (d.status === "CAMERA_ERROR") {
+        cancelPresentation();
+        renderStatus();
+        return;
+      }
+
+      for (const word of d.words || []) {
+        if (!Number.isFinite(word.seq) || word.seq <= lastSeq) continue;
+        if (typeof word.word !== "string") continue;
+
+        lastSeq = word.seq;
+        addHistory(word);
+        wordQueue.push(word);
+      }
+
+      presentNext();
+      renderStatus();
+    };
+
+    ws.onclose = () => {
+      if (socket !== ws) return;
+      socket = null;
+      if (!active) return;
+
+      cancelPresentation();
+      showError("서버 연결이 끊겼습니다. 다시 연결하고 있어요.");
+      $("statusBadge").textContent = "서버 연결 끊김";
+      $("statusBadge").style.color = "var(--error)";
+      $("resultText").className = "";
+      $("resultText").textContent = "연결을\n확인하고 있어요";
+      $("resultHint").textContent = "잠시만 기다려 주세요.";
+      retryTimer = setTimeout(connect, 2000);
+    };
+  }
+
+  $("start").addEventListener("click", async () => {
+    const button = $("start");
+    if (button.disabled || active) return;
+
+    const version = ++sessionVersion;
+    button.disabled = true;
+    button.textContent = "연결 중…";
+    showError(null);
+
+    // 사용자 클릭 시점에 음성을 준비합니다.
+    try {
+      const warm = new SpeechSynthesisUtterance(" ");
+      warm.lang = "ko-KR";
+      speechSynthesis.speak(warm);
+    } catch {
+      // 음성 기능이 없어도 텍스트 출력은 계속 이용합니다.
+    }
+
+    try {
+      const state = await requestSession("start");
+      if (version !== sessionVersion) return;
+
+      if (!state.session_active) {
+        throw new Error(state.error || "인식을 시작하지 못했습니다.");
+      }
+
+      resetHistory();
+      cancelPresentation();
+      bootId = null;
+      lastSeq = 0;
+      active = true;
+      latest = state;
+
+      showScreen("main");
+      $("cam").src = "/video";
+      renderCamera(state);
+      renderStatus();
+      showError(state.error);
+      connect();
+    } catch (error) {
+      if (version === sessionVersion) {
+        showError(`시작하지 못했습니다. ${error.message}`);
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = "시작하기";
+    }
   });
-});
-$("clear").addEventListener("click", () => {
-  $("history").innerHTML = "";
-  const el = $("word");
-  el.className = "placeholder";
-  el.textContent = "카메라 앞에서 수어를 시작하세요";
-});
+
+  $("stop").addEventListener("click", async () => {
+    const button = $("stop");
+    if (button.disabled || !active) return;
+
+    const version = sessionVersion;
+    button.disabled = true;
+    button.textContent = "종료 중…";
+
+    try {
+      const state = await requestSession("stop");
+
+      // WebSocket으로 이미 종료 확인을 받았다면 처리하지 않습니다.
+      if (version !== sessionVersion) return;
+
+      if (state.session_active !== false) {
+        throw new Error("서버에서 종료가 확인되지 않았습니다.");
+      }
+
+      finishSession();
+    } catch (error) {
+      if (version === sessionVersion && active) {
+        showError(`종료하지 못했습니다. 다시 눌러 주세요. ${error.message}`);
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = "종료하기";
+    }
+  });
+
+  $("backToStart").addEventListener("click", () => {
+    showError(null);
+    showScreen("start");
+    // 시작하기를 다시 누르기 전에는 세션을 활성화하지 않습니다.
+  });
 </script>
 </body>
 </html>
