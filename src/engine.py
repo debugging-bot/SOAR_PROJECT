@@ -6,7 +6,7 @@ realtime.py(콘솔)와 server.py(브라우저)는 반드시 같은 추론 규칙
 서로 달라져 있었다. 이제 두 파일 모두 이 클래스 하나만 쓴다.
 
 한 단계에서 하는 일
-    프레임 -> Landmarker -> build_feature_vector -> FrameSampler
+    프레임 -> Landmarker -> (주 사용자 손만, person.py) -> build_feature_vector -> FrameSampler
           -> (손이 충분히 보일 때만) 모델 예측 -> Confirmer
           -> 확정되면 버퍼를 비우고 그 단어는 재확정 잠금 (confirm.py)
 
@@ -62,9 +62,10 @@ class RecognitionEngine:
     """
 
     def __init__(self, predict_fn=None, threshold=CONF_THRESHOLD,
-                 every=PREDICT_EVERY, landmarker=None, clock=time.time):
+                 every=PREDICT_EVERY, landmarker=None, selector=None, clock=time.time):
         self.predict_fn = predict_fn    # (1,30,146) -> (클래스 수,) 확률. None이면 예측 생략
         self.landmarker = landmarker
+        self.selector = selector        # person.PrimaryUserSelector. 있으면 주 사용자 손만 쓴다
         self.every = max(1, int(every))
         self.sampler = FrameSampler()
         self.confirmer = Confirmer(threshold=threshold, clock=clock)
@@ -73,7 +74,11 @@ class RecognitionEngine:
 
     def step(self, frame_bgr) -> StepResult:
         """카메라 프레임 한 장. 거울 반전은 호출하는 쪽에서 미리 한다."""
-        hands, pose = self.landmarker.process(frame_bgr)
+        if self.selector is not None and hasattr(self.landmarker, "process_all"):
+            hands, poses = self.landmarker.process_all(frame_bgr)
+            hands, pose = self.selector.select(hands, poses)
+        else:
+            hands, pose = self.landmarker.process(frame_bgr)
         res = self.feed(build_feature_vector(hands, pose))
         res.hands = hands
         return res
@@ -118,6 +123,8 @@ class RecognitionEngine:
         """버퍼와 예측 기록을 모두 버린다. 카메라 재연결·세션 시작 때 부른다."""
         self.sampler.reset()
         self.confirmer.reset()
+        if self.selector is not None:
+            self.selector.reset()
         self.top_id, self.top_conf = -1, 0.0
 
 

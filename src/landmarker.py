@@ -34,16 +34,22 @@ class Landmarker:
         lm.close()
 
     반환값
-        hands : [(21,3), ...]  최대 2개. 못 찾으면 빈 리스트.
+        hands : [(21,3), ...]  최대 max_hands개. 못 찾으면 빈 리스트.
         pose  : (33,3) 또는 None
+
+    여러 사람이 화면에 있을 때 (실시간 전용, person.py가 주 사용자를 고른다)
+        lm = Landmarker(max_hands=4, max_poses=3)
+        hands, poses = lm.process_all(frame_bgr)   # poses: [(33,3), ...]
+    촬영(collect.py)은 기본값(손 2, 사람 1)과 process()를 그대로 쓴다.
     """
 
-    def __init__(self, max_hands: int = 2):
+    def __init__(self, max_hands: int = 2, max_poses: int = 1):
         import mediapipe as mp
         self.mp = mp
         self.backend = None
         self._ts = 0            # VIDEO 모드는 타임스탬프가 항상 증가해야 한다
         self.max_hands = max_hands
+        self.max_poses = max_poses
 
         # ---------- 1순위: 새 방식(Tasks API) ----------
         try:
@@ -91,7 +97,7 @@ class Landmarker:
         pose_opts = mp.tasks.vision.PoseLandmarkerOptions(
             base_options=BaseOptions(model_asset_path=str(POSE_TASK)),
             running_mode=VisionRunningMode.VIDEO,
-            num_poses=1,
+            num_poses=self.max_poses,
             min_pose_detection_confidence=0.5,
             min_tracking_confidence=0.5,
         )
@@ -115,7 +121,12 @@ class Landmarker:
 
     # ------------------------------------------------------------ 처리
     def process(self, frame_bgr):
-        """OpenCV BGR 이미지 한 장 -> (hands, pose)"""
+        """OpenCV BGR 이미지 한 장 -> (hands, pose). pose는 첫 번째 사람."""
+        hands, poses = self.process_all(frame_bgr)
+        return hands, (poses[0] if poses else None)
+
+    def process_all(self, frame_bgr):
+        """OpenCV BGR 이미지 한 장 -> (hands, poses). 검출된 사람 전원의 상체."""
         import cv2
         rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
 
@@ -132,12 +143,11 @@ class Landmarker:
         pres = self.pose.detect_for_video(mp_image, self._ts)
 
         hands = [_to_array(h, 21) for h in (hres.hand_landmarks or [])]
-        pose = None
-        if pres.pose_landmarks:
-            pose = _to_array(pres.pose_landmarks[0], 33)
-        return hands, pose
+        poses = [_to_array(p, 33) for p in (pres.pose_landmarks or [])]
+        return hands, poses
 
     def _process_legacy(self, rgb):
+        # 옛 방식은 사람을 1명만 찾는다
         rgb.flags.writeable = False
         hres = self.hand.process(rgb)
         pres = self.pose.process(rgb)
@@ -146,10 +156,10 @@ class Landmarker:
         hands = []
         if hres.multi_hand_landmarks:
             hands = [_to_array(h.landmark, 21) for h in hres.multi_hand_landmarks]
-        pose = None
+        poses = []
         if pres.pose_landmarks:
-            pose = _to_array(pres.pose_landmarks.landmark, 33)
-        return hands, pose
+            poses = [_to_array(pres.pose_landmarks.landmark, 33)]
+        return hands, poses
 
     # ------------------------------------------------------------ 정리
     def close(self):

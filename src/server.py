@@ -52,6 +52,8 @@ from config import CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR, SEQ_LEN
 from engine import RecognitionEngine, load_keras_predict
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
+from overlay import draw_overlay
+from person import GUIDE_BOX, MAX_HANDS_SCAN, MAX_PEOPLE, PrimaryUserSelector
 from sampler import FrameSampler
 
 BOOT_ID = uuid.uuid4().hex[:8]   # 서버를 켤 때마다 바뀐다. 브라우저가 재시작을 알아챈다
@@ -117,6 +119,7 @@ def snapshot():
             "model": STATE["model"],
             "session_active": STATE["session"],
             "last_seq": STATE["seq"],
+            "guide_box": list(GUIDE_BOX),   # 가이드 프레임 (x0, y0, x1, y1), 화면 비율
         }
 
 
@@ -134,7 +137,9 @@ class Worker:
     """
 
     def __init__(self, demo, threshold, open_cam=open_camera,
-                 make_landmarker=Landmarker, load_predict=load_keras_predict,
+                 make_landmarker=lambda: Landmarker(max_hands=MAX_HANDS_SCAN,
+                                                    max_poses=MAX_PEOPLE),
+                 load_predict=load_keras_predict,
                  retry_sec=CAM_RETRY_SEC, fail_limit=CAM_FAIL_LIMIT, crash_backoff=1.0):
         self.demo = demo
         self.threshold = threshold
@@ -181,7 +186,8 @@ class Worker:
 
         print(f"[worker] 인식 창 {FrameSampler.window_seconds():.1f}초 "
               f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
-        return RecognitionEngine(predict, threshold=self.threshold, landmarker=self.lm)
+        return RecognitionEngine(predict, threshold=self.threshold, landmarker=self.lm,
+                                 selector=PrimaryUserSelector())
 
     # ------------------------------------------------------------ 카메라
     def _open_camera(self, engine):
@@ -251,11 +257,8 @@ class Worker:
         if res.confirmed is not None:
             self._publish(res.confirmed, res.conf)
 
-        # 손 위치 점만 가볍게 그린다
-        h, w = frame.shape[:2]
-        for hand in res.hands:
-            for (x_, y_, _z) in hand:
-                cv2.circle(frame, (int(x_ * w), int(y_ * h)), 3, (0, 220, 120), -1)
+        # 인식에 쓰는 손만 초록 점으로 가볍게 그린다 (점 전부 보기는 realtime.py)
+        draw_overlay(frame, res.hands, full=False)
         return frame, res.status, res.progress
 
     # ------------------------------------------------------------ 감독 루프

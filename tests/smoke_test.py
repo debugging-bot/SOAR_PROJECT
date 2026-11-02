@@ -473,6 +473,79 @@ except ImportError as e:
 
 print()
 print("=" * 60)
+print("9. 주 사용자 고정 (다인원, 카메라 없이)")
+print("=" * 60)
+
+from person import PrimaryUserSelector  # noqa: E402
+
+
+def person_pose(cx, width, y=0.45):
+    """어깨 중심 x=cx, 어깨 폭 width인 사람. 손목(15·16)은 어깨 바로 아래."""
+    p = np.zeros((33, 3), dtype=np.float32)
+    p[11] = (cx - width / 2, y, 0.0)
+    p[12] = (cx + width / 2, y, 0.0)
+    p[13] = (cx - width / 2, y + 0.2, 0.0)
+    p[14] = (cx + width / 2, y + 0.2, 0.0)
+    p[15] = (cx - width / 2, y + 0.1, 0.0)
+    p[16] = (cx + width / 2, y + 0.1, 0.0)
+    return p
+
+
+user = person_pose(0.50, 0.30)                  # 정면 사용자
+side = person_pose(0.82, 0.12)                  # 옆에 멀리 선 사람
+u_hands = [fake_hand((0.35, 0.55), seed=1), fake_hand((0.65, 0.55), seed=2)]
+s_hands = [fake_hand((0.76, 0.55), seed=3), fake_hand((0.88, 0.55), seed=4)]
+
+
+def same(a, b):
+    return len(a) == len(b) and all(np.array_equal(x, y) for x, y in zip(a, b))
+
+
+h, p = PrimaryUserSelector().select(u_hands, [user])
+ok("1명일 때는 이전과 같은 손·상체", same(h, u_hands) and p is user)
+
+h, p = PrimaryUserSelector().select(s_hands + u_hands, [side, user])
+ok("옆 사람 손이 먼저 잡혀도 사용자 손만 남긴다", same(h, u_hands) and p is user,
+   f"손 {len(h)}개")
+
+h, _ = PrimaryUserSelector().select(u_hands + [fake_hand((0.05, 0.5), seed=5)], [user])
+ok("가이드 프레임 밖 손은 버린다", same(h, u_hands), f"손 {len(h)}개")
+
+# 뒤에 선 사람: 몸이 가려져 상체는 안 잡히고, 손만 사용자 어깨 너머로 보임 (실측에서 발견)
+behind = [fake_hand((0.62, 0.22), seed=6), fake_hand((0.30, 0.25), seed=7)]
+sel = PrimaryUserSelector()
+h, p = sel.select(behind + u_hands, [user])
+ok("뒤 사람 상체가 안 잡혀도 그 손은 버린다", same(h, u_hands) and p is user,
+   f"남은 손 {len(h)}개, 버린 손 {len(sel.rejected)}개")
+h, _ = PrimaryUserSelector().select(behind, [user])
+ok("사용자 손이 내려가 있으면 뒤 사람 손만으로 인식하지 않음", h == [], f"손 {len(h)}개")
+
+sel = PrimaryUserSelector()
+sel.select(u_hands, [user])
+near = person_pose(0.28, 0.45)                  # 더 가까운 사람이 들어옴
+_, p = sel.select(u_hands, [near, user])
+ok("더 가까운 사람이 와도 주 사용자 유지", p is user)
+_, p = sel.select([], [near])
+ok("사용자가 나가면 남은 사람으로 다시 선택", p is near)
+
+h, p = PrimaryUserSelector().select(u_hands, [person_pose(0.96, 0.15)])
+ok("가이드 안에 사람이 없으면 손을 모두 버림 (대기)", h == [] and p is None)
+
+h, p = PrimaryUserSelector().select(u_hands, [])
+ok("상체를 못 찾으면 손만 그대로 사용", same(h, u_hands) and p is None)
+
+
+class CrowdLm:
+    def process_all(self, frame):
+        return s_hands + u_hands, [side, user]
+
+
+eng5 = RecognitionEngine(None, landmarker=CrowdLm(), selector=PrimaryUserSelector())
+r = eng5.step(np.zeros((120, 160, 3), np.uint8))
+ok("엔진이 주 사용자 손만 특징에 넣는다", r.n_hand == 2 and same(r.hands, u_hands))
+
+print()
+print("=" * 60)
 print(f"통과 {passed}개 / 실패 {failed}개")
 print("=" * 60)
 raise SystemExit(1 if failed else 0)

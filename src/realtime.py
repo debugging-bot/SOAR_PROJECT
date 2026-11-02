@@ -12,6 +12,7 @@ realtime.py — 웹캠 앞에서 실시간으로 단어를 인식한다. (조원
 조작
     q : 종료
     r : 버퍼 초기화
+    d : 인식 점 표시 켜기/끄기 (손·상체·손목 범위·가이드 프레임, overlay.py)
 """
 
 import argparse
@@ -29,6 +30,8 @@ from config import (CONF_THRESHOLD, FRAME_STRIDE, KERAS_MODEL, MIRROR,
 from engine import RecognitionEngine, load_keras_predict
 from labels import id_to_display, load_labels
 from landmarker import Landmarker, open_camera
+from overlay import LEGEND, draw_overlay
+from person import MAX_HANDS_SCAN, MAX_PEOPLE, PrimaryUserSelector
 from sampler import FrameSampler
 
 # ---------------------------------------------------------------- 한글 그리기
@@ -85,17 +88,19 @@ def main():
     disp = id_to_display(words)
 
     cap = open_camera()
-    lm = Landmarker()
+    lm = Landmarker(max_hands=MAX_HANDS_SCAN, max_poses=MAX_PEOPLE)
     engine = RecognitionEngine(predict, threshold=args.threshold,
-                               every=args.every, landmarker=lm)
+                               every=args.every, landmarker=lm,
+                               selector=PrimaryUserSelector())
 
     fps_t, fps_n, fps = time.time(), 0, 0.0
     history: list[str] = []
     banner, banner_until = "", 0.0
+    show_points = True
 
     print(f"인식 창 {FrameSampler.window_seconds():.1f}초 "
           f"(표본 {SEQ_LEN}개, 카메라 {FRAME_STRIDE}프레임마다 1개)")
-    print("준비 완료. 카메라 앞에서 수어를 해 보세요. (q=종료)")
+    print("준비 완료. 카메라 앞에서 수어를 해 보세요. (q=종료, d=점 표시 켜기/끄기)")
     try:
         while True:
             ok, frame = cap.read()
@@ -112,11 +117,11 @@ def main():
                 print(f"  >>> 확정: {text}  (확신도 {res.conf:.2f})")
 
             # ---------------- 화면 ----------------
-            for hand in res.hands:
-                for (x_, y_, _z) in hand:
-                    cv2.circle(frame, (int(x_ * frame.shape[1]),
-                                       int(y_ * frame.shape[0])),
-                               3, (0, 220, 120), -1)
+            # 인식에 쓰는 점 전부 (손·상체·손목 범위·가이드 프레임). d 키로 끄고 켠다
+            draw_overlay(frame, res.hands, engine.selector, full=show_points)
+            if show_points:
+                cv2.putText(frame, LEGEND, (10, frame.shape[0] - 16),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
 
             fps_n += 1
             if time.time() - fps_t >= 1.0:
@@ -126,7 +131,8 @@ def main():
                      "READING": (0, 255, 0)}[res.status]
             cv2.putText(frame, f"{res.status}  fps={fps:4.1f}  "
                                f"buf={len(engine.sampler)}/{SEQ_LEN}  "
-                               f"infer={engine.infer_ms:.0f}ms",
+                               f"infer={engine.infer_ms:.0f}ms  "
+                               f"people={engine.selector.n_people}",
                         (10, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             if res.top_id >= 0:
                 cv2.putText(frame, f"top=id{res.top_id} conf={res.top_conf:.2f}",
@@ -146,6 +152,8 @@ def main():
                 break
             if key == ord("r"):
                 engine.reset()
+            if key == ord("d"):
+                show_points = not show_points
     finally:
         cap.release()
         lm.close()
