@@ -5,6 +5,8 @@ data/
 *.npy
 .DS_Store
 .vscode/
+# 컴퓨터마다 다른 카메라 번호 (run_test.bat 8번)
+camera.local
 
 # models 폴더는 막되, 학습된 모델과 학습 기록만 올린다
 models/*

@@ -38,6 +38,7 @@ echo   4. 서버 + 브라우저  (server.py --auto-start --debug)
 echo   5. 서버 상태 보기   (GET /api/status)
 echo   6. 워커 오류 주입   (NFR-05 시험, 4번 실행 중일 때)
 echo   7. 세션 종료/시작   (S07 / S00 시험, 4번 실행 중일 때)
+echo   8. 카메라 선택      (list_cameras, 서버를 끈 상태에서)
 echo   0. 끝내기
 echo ============================================================
 set "choice="
@@ -51,6 +52,7 @@ if "%choice%"=="4" goto server
 if "%choice%"=="5" goto status
 if "%choice%"=="6" goto fault
 if "%choice%"=="7" goto session
+if "%choice%"=="8" goto camera
 if "%choice%"=="0" goto end
 echo 잘못 고르셨습니다: "%choice%"
 set RC=2
@@ -136,6 +138,26 @@ if errorlevel 1 (
     set RC=1
 )
 echo.
+goto next
+
+:camera
+set OPENCV_LOG_LEVEL=OFF
+python setup\list_cameras.py
+if errorlevel 1 (
+    set RC=1
+    set "OPENCV_LOG_LEVEL="
+    goto next
+)
+set "cam=%~2"
+if not defined cam set /p "cam=쓸 카메라 번호 (그대로 두려면 Enter): "
+if not defined cam (
+    set "OPENCV_LOG_LEVEL="
+    goto next
+)
+python setup\list_cameras.py --set %cam%
+if errorlevel 1 set RC=1
+set "cam="
+set "OPENCV_LOG_LEVEL="
 goto next
 
 :next

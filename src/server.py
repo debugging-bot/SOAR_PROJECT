@@ -394,7 +394,9 @@ def build_app(demo: bool, threshold: float, start_worker: bool = True,
     # ---------------------------------------------------- SL-IF-1001 메인 화면
     @app.get("/")
     def index():
-        return FileResponse(web_dir / "index.html")
+        # 캐시 헤더가 없으면 브라우저가 예전 화면을 그대로 보여 줄 수 있어 매번 확인하게 한다
+        return FileResponse(web_dir / "index.html",
+                            headers={"Cache-Control": "no-cache"})
 
     app.mount("/static", StaticFiles(directory=str(web_dir)), name="static")
 

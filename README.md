@@ -106,7 +106,7 @@ teammate/
 |---|---|
 | `ModuleNotFoundError: No module named 'cv2'` | `venv` activate를 안 한 것. 다시 activate 후 설치 |
 | `모델 파일이 없습니다` | `python setup/download_models.py` |
-| `웹캠을 열 수 없습니다` | 줌·팀즈 끄기 / 노트북 카메라 셔터 확인 / `src/config.py`의 `CAM_INDEX`를 1, 2로 바꿔 보기 |
+| `웹캠을 열 수 없습니다` | 줌·팀즈 끄기 / 노트북 카메라 셔터 확인 / `run_test.bat 8`로 다른 카메라 고르기 |
 | 촬영 시간이 짧게 느껴짐 | 녹화 창은 `src/config.py`의 `SEQ_LEN x FRAME_STRIDE / 30`초입니다. 현재 30 x 2 / 30 = 2.0초. 값을 바꾸면 이미 찍은 데이터는 쓸 수 없습니다 |
 | 화면 글씨가 네모(□)로 보임 | OpenCV는 한글을 못 그림. 정상이며, 브라우저 화면(`server.py`)에서는 정상 출력됨 |
 | 학습은 잘됐는데 실시간에서만 못 맞춤 | 학습과 실시간이 같은 `features.build_feature_vector`를 쓰는지 확인 (가장 흔한 원인) |

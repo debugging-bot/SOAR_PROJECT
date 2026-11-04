@@ -56,7 +56,20 @@ FALLBACK_WIDTH = 0.25               # 어깨 너비를 화면 폭의 25%로 가�
 EPS = 1e-6
 
 # ---------------------------------------------------------------- 카메라
-CAM_INDEX = 0         # 웹캠이 여러 개면 0, 1, 2 로 바꿔 본다
+# 카메라 번호는 컴퓨터마다 다르므로 여기 고정하지 않는다.
+# run_test.bat 8번(setup/list_cameras.py)이 고른 번호를 루트의 camera.local에 저장하고,
+# 파일이 없거나 읽을 수 없으면 0번을 쓴다.
+CAM_FILE = ROOT / "camera.local"
+
+
+def _load_cam_index():
+    try:
+        return int(CAM_FILE.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return 0
+
+
+CAM_INDEX = _load_cam_index()
 CAM_WIDTH = 640
 CAM_HEIGHT = 480
 MIRROR = True         # 화면을 거울처럼 좌우 반전할지. 반드시 True로 고정.
