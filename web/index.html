@@ -199,6 +199,28 @@
 
     #resultHint { margin: 0; font-size: 20px; color: var(--muted); }
 
+    /* 확정 단어 옆에 수형 그림을 놓습니다. 그림은 자르거나 덧칠하지 않고 크기만 조절합니다. */
+    .result-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 12px 40px;
+    }
+
+    #signBox { margin: 0; text-align: center; }
+    #signImgs { display: flex; justify-content: center; gap: 12px; }
+
+    #signImgs img {
+      display: block;
+      height: clamp(170px, 24vw, 280px);
+      width: auto;
+      background: #FFFFFF;
+      border: 1px solid var(--line);
+    }
+
+    #signBox figcaption { margin-top: 8px; font-size: 15px; color: var(--muted); }
+
     .history { margin-top: 24px; }
     .history p { color: var(--muted); font-size: 18px; }
 
@@ -360,8 +382,14 @@
 
     <section class="card result">
       <p id="resultLabel">수어로 말씀해 주세요</p>
-      <h1 id="resultText">편하게 수어로
-        말씀해 주세요</h1>
+      <div class="result-row">
+        <h1 id="resultText">편하게 수어로
+          말씀해 주세요</h1>
+        <figure id="signBox" hidden>
+          <div id="signImgs"></div>
+          <figcaption>출처: 국립국어원 한국수어사전</figcaption>
+        </figure>
+      </div>
       <p id="resultHint">준비되면 수어를 시작해 주세요.</p>
     </section>
   </div>
@@ -459,6 +487,7 @@
     $("statusBadge").textContent = state.badge;
     $("statusBadge").style.color = state.color;
     $("resultLabel").textContent = "수어로 말씀해 주세요";
+    hideSign();
     $("resultText").className = "";
     $("resultText").textContent = state.text;
     $("resultHint").textContent = state.hint;
@@ -520,7 +549,48 @@
     $("historyList").scrollTop = $("historyList").scrollHeight;
   }
 
+  // 수형 그림: web/signs/signs.json 의 추천 항목 그림을 단어 번호(id)로 찾습니다.
+  // 그림이 없거나 불러오지 못해도 글씨와 음성은 그대로 나옵니다.
+  const signImages = {};
+
+  async function loadSigns() {
+    try {
+      const response = await fetch("/static/signs/signs.json");
+      if (!response.ok) return;
+      for (const w of await response.json()) {
+        const list = w.entries || [];
+        const entry = list.find(e => e.recommended) || list[0];
+        if (entry && entry.images && entry.images.length) {
+          signImages[w.id] = entry.images.map(p => `/static/signs/${p}`);
+        }
+      }
+    } catch {
+      // 그림 목록을 못 읽어도 인식은 계속합니다.
+    }
+  }
+
+  function showSign(word) {
+    const urls = signImages[word.id];
+    if (!urls) { hideSign(); return; }
+
+    const box = $("signImgs");
+    box.replaceChildren(...urls.map(url => {
+      const img = document.createElement("img");
+      img.src = url;
+      img.alt = `${word.word} 수형 그림`;
+      img.onerror = () => img.remove();
+      return img;
+    }));
+    $("signBox").hidden = false;
+  }
+
+  function hideSign() {
+    $("signBox").hidden = true;
+    $("signImgs").replaceChildren();
+  }
+
   function cancelPresentation() {
+    hideSign();
     // 취소된 음성의 onend 등이 나중에 실행돼도 무시합니다.
     presentationVersion++;
     clearTimeout(releaseTimer);
@@ -547,6 +617,7 @@
     $("resultLabel").textContent = "전달된 말";
     $("resultText").className = "confirmed";
     $("resultText").textContent = word.word;
+    showSign(word);
     $("resultHint").textContent = "다음 수어도 이어서 말씀해 주세요.";
 
     let finishing = false;
@@ -779,6 +850,8 @@
       button.textContent = "종료하기";
     }
   });
+
+  loadSigns();
 
   $("backToStart").addEventListener("click", () => {
     showError(null);
