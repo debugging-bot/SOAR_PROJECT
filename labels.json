@@ -7,7 +7,7 @@
     {"id": 2,  "slug": "toilet",       "ko": "화장실",        "display": "화장실"},
     {"id": 3,  "slug": "police",        "ko": "경찰",     "display": "경찰"},
     {"id": 4,  "slug": "pain",      "ko": "아프다",     "display": "아파요"},
-    {"id": 5,  "slug": "help",      "ko": "돕다",       "display": "도와주세요"},
+    {"id": 5,  "slug": "help",      "ko": "돕다",       "display": "도움"},
     {"id": 6,  "slug": "idcard",   "ko": "신분증",         "display": "신분증"},
     {"id": 7,  "slug": "phone",  "ko": "전화",         "display": "전화"},
     {"id": 8,  "slug": "wait",  "ko": "잠시만요",       "display": "잠시만요"},
