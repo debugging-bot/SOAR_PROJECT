@@ -1,0 +1,236 @@
+[
+  {
+    "id": 0,
+    "slug": "yes",
+    "ko": "네",
+    "display": "네",
+    "entries": [
+      {
+        "origin_no": "9474",
+        "title": "예",
+        "search": "예",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=9474",
+        "description": "오른 주먹의 1·2·4지를 펴서 등이 밖으로 향하게 벌려 1·2지 끝을 오른쪽 눈 옆에 댄다.",
+        "images": [
+          "yes/9474_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151226/234997/IMG000230137_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 1,
+    "slug": "no",
+    "ko": "아니요",
+    "display": "아니요",
+    "entries": [
+      {
+        "origin_no": "11433",
+        "title": "아니다,아니,부인(하다)",
+        "search": "아니",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=11433",
+        "description": "두 주먹의 1·5지를 펴서 끝이 마주 보게 하였다가 손목을 양옆으로 돌린다.",
+        "images": [
+          "no/11433_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151206/223148/IMG000215305_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "slug": "toilet",
+    "ko": "화장실",
+    "display": "화장실",
+    "entries": [
+      {
+        "origin_no": "971",
+        "title": "화장실,변소",
+        "search": "화장실",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=971",
+        "description": "오른손을 펴서 손바닥이 밖으로 향하게 세워 2·3·4지를 벌리고 1·5지를 ‘C’자 모양으로 구부린다.",
+        "images": [
+          "toilet/971_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151120/213292/IMG000203972_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "slug": "police",
+    "ko": "경찰",
+    "display": "경찰",
+    "entries": [
+      {
+        "origin_no": "6890",
+        "title": "경찰,순경,순사",
+        "search": "경찰",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=6890",
+        "description": "오른 주먹의 1·2·5지를 펴서 5지 등을 이마 중앙에 대고 1·2지를 두 번 상하로 흔든다.",
+        "images": [
+          "police/6890_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151216/229145/IMG000222465_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "slug": "pain",
+    "ko": "아프다",
+    "display": "아파요",
+    "entries": [
+      {
+        "origin_no": "5621",
+        "title": "편찮다,아프다",
+        "search": "아프다",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=5621",
+        "description": "손바닥이 위로 향하게 약간 오므린 오른손을 좌우로 흔든다.",
+        "images": [
+          "pain/5621_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151226/235081/IMG000230111_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "slug": "help",
+    "ko": "돕다",
+    "display": "도와주세요",
+    "entries": [
+      {
+        "origin_no": "5447",
+        "title": "돕다,거들다,기여,도움,보조,원조,지원,찬조",
+        "search": "돕다",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=5447",
+        "description": "왼 주먹의 5지를 펴서 바닥이 밖으로 향하게 세우고, 그 등에 오른 손바닥을 세워 두 번 댄다.",
+        "images": [
+          "help/5447_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151221/231809/IMG000225920_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "slug": "idcard",
+    "ko": "신분증",
+    "display": "신분증",
+    "entries": [
+      {
+        "origin_no": "9497",
+        "title": "주민등록증",
+        "search": "주민등록증",
+        "category": "전문용어 수어",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=9497",
+        "description": "두 주먹의 5지를 펴서 끝이 밖으로 향하게 바닥이 마주 보게 하였다가 중앙으로 돌린 다음, 두 주먹의 1·5지를 펴서 끝으로 네모를 그린다.",
+        "images": [
+          "idcard/9497_1.jpg",
+          "idcard/9497_2.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20160101/238328/IMG000234331_700X466.jpg",
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20160101/238329/IMG000234332_700X466.jpg"
+        ],
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "slug": "phone",
+    "ko": "전화",
+    "display": "전화",
+    "entries": [
+      {
+        "origin_no": "7229",
+        "title": "전화,전화기",
+        "search": "전화",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=7229",
+        "description": "오른 주먹의 4·5지를 펴서 5지를 귀에 4지를 입앞에 댄다.",
+        "images": [
+          "phone/7229_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151229/236730/IMG000232302_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "slug": "wait",
+    "ko": "잠시만요",
+    "display": "잠시만요",
+    "entries": [
+      {
+        "origin_no": "4795",
+        "title": "잠깐,잠시",
+        "search": "잠시",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=4795",
+        "description": "1·5지 끝을 맞대어 동그라미를 만든 두 주먹을 모로 세워 좌우에서 접근시켜 맞댄 다음, 두 손을 펴서 손끝이 밖으로 향하게 모로 세워 두 손바닥이 마주 보게 하여 어깨 높이에서 가슴 높이로 내린다.",
+        "images": [
+          "wait/4795_1.jpg",
+          "wait/4795_2.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151201/220072/IMG000211792_700X466.jpg",
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151201/220073/IMG000211793_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "slug": "trouble",
+    "ko": "곤란",
+    "display": "곤란해요",
+    "entries": [
+      {
+        "origin_no": "4439",
+        "title": "곤란",
+        "search": "곤란",
+        "page": "https://sldict.korean.go.kr/front/sign/signContentsView.do?origin_no=4439",
+        "description": "약간 굽힌 오른손의 손끝으로 머리 오른쪽을 전후로 스친다.",
+        "images": [
+          "trouble/4439_1.jpg"
+        ],
+        "image_urls": [
+          "https://sldict.korean.go.kr/multimedia/multimedia_files/convert/20151214/227511/IMG000220412_700X466.jpg"
+        ],
+        "category": "일상생활 수어",
+        "recommended": true
+      }
+    ]
+  }
+]
